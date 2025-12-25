@@ -1,0 +1,520 @@
+/* Custom Styles */
+:root {
+  --primary-color: #0d6efd;
+  --secondary-color: #6c757d;
+  --success-color: #198754;
+  --warning-color: #ffc107;
+  --danger-color: #dc3545;
+}
+
+/* General Styles */
+body {
+  background-color: #f8f9fa;
+}
+
+/* Card Styles */
+.card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Calendar Styles */
+.calendar {
+  width: 100%;
+}
+
+.calendar-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  font-weight: bold;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 10px 0;
+  border-radius: 5px 5px 0 0;
+}
+
+.calendar-body {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background-color: #dee2e6;
+  border: 1px solid #dee2e6;
+  border-top: none;
+}
+
+.calendar-day {
+  background-color: white;
+  min-height: 100px;
+  padding: 5px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+  background-color: #e9ecef;
+}
+
+.calendar-day.empty {
+  background-color: #f8f9fa;
+  cursor: default;
+}
+
+.calendar-day.has-events {
+  background-color: #e3f2fd;
+}
+
+.day-number {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.event-indicator {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.event-count {
+  font-size: 0.8rem;
+  background-color: var(--primary-color);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
+
+.event-preview {
+  margin-top: 5px;
+  font-size: 0.8rem;
+}
+
+.event-preview-item {
+  padding: 2px 4px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.8rem;
+}
+
+.event-preview-item.status-finalizado {
+  background-color: rgba(108, 117, 125, 0.1);
+  border-left: 3px solid var(--secondary-color);
+  color: var(--secondary-color);
+}
+
+.event-preview-item.status-andamento {
+  background-color: rgba(25, 135, 84, 0.1);
+  border-left: 3px solid var(--success-color);
+  color: var(--success-color);
+}
+
+.event-preview-item.status-aguardando {
+  background-color: rgba(255, 193, 7, 0.1);
+  border-left: 3px solid var(--warning-color);
+  color: var(--warning-color);
+}
+
+.event-time {
+  color: var(--secondary-color);
+  margin-right: 5px;
+}
+
+.event-client {
+  font-weight: 500;
+}
+
+/* Status Badges */
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.status-finalizado {
+  background-color: var(--success-color);
+  color: white;
+}
+
+.status-andamento {
+  background-color: var(--warning-color);
+  color: black;
+}
+
+.status-aguardando {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+/* List Group Item Status */
+.list-group-item.status-finalizado {
+  background-color: rgba(108, 117, 125, 0.05);
+  border-left: 4px solid var(--secondary-color);
+}
+
+.list-group-item.status-andamento {
+  background-color: rgba(25, 135, 84, 0.05);
+  border-left: 4px solid var(--success-color);
+}
+
+.list-group-item.status-aguardando {
+  background-color: rgba(255, 193, 7, 0.05);
+  border-left: 4px solid var(--warning-color);
+}
+
+/* Form Styles */
+.form-control:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Table Styles */
+.table-hover tbody tr:hover {
+  background-color: rgba(13, 110, 253, 0.1);
+}
+
+/* Dashboard Cards */
+.dashboard-card {
+  border-left: 4px solid var(--primary-color);
+}
+
+.dashboard-card .card-body {
+  padding: 1.5rem;
+}
+
+.dashboard-card .card-title {
+  color: var(--secondary-color);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dashboard-card .card-text {
+  color: var(--primary-color);
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 0;
+}
+
+/* Modal Styles */
+.modal-header {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+/* List Group Styles */
+.list-group-item {
+  border-left: none;
+  border-right: none;
+}
+
+.list-group-item:first-child {
+  border-top: none;
+}
+
+.list-group-item:last-child {
+  border-bottom: none;
+}
+
+/* Chart Styles */
+canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .container-fluid {
+    padding: 0.5rem;
+  }
+
+  .card {
+    margin-bottom: 1rem;
+  }
+
+  .calendar-day {
+    min-height: 80px;
+  }
+
+  .dashboard-card .card-text {
+    font-size: 1.5rem;
+  }
+
+  .event-preview {
+    display: none;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .navbar,
+  .btn,
+  .modal-footer {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #dee2e6;
+  }
+
+  .container {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+/* Estilos para os eventos no calendário */
+.list-group-item {
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.list-group-item.status-aguardando {
+  border-left: 4px solid #ffc107;
+}
+
+.list-group-item.status-andamento {
+  border-left: 4px solid #28a745;
+}
+
+.list-group-item.status-finalizado {
+  border-left: 4px solid #6c757d;
+}
+
+.list-group-item .badge {
+  font-size: 0.875rem;
+  padding: 0.5em 0.75em;
+}
+
+.badge.status-aguardando {
+  background-color: #ffc107;
+  color: #000;
+}
+
+.badge.status-andamento {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.badge.status-finalizado {
+  background-color: var(--secondary-color);
+  color: white;
+}
+
+/* Garantir que o texto seja sempre visível */
+.list-group-item h6,
+.list-group-item p,
+.list-group-item strong,
+.list-group-item small {
+  color: #212529;
+}
+
+.list-group-item .text-muted {
+  color: #6c757d !important;
+}
+/* Timeline Styles */
+.timeline-container {
+  position: relative;
+}
+
+.timeline-item {
+  position: relative;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.timeline-time {
+  position: relative;
+}
+
+.timeline-item .card {
+  transition: all 0.3s ease;
+}
+
+.timeline-item .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Dashboard Header Gradient */
+.bg-gradient-primary {
+  background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+}
+
+/* Cards com borda colorida */
+.border-start {
+  border-left-width: 4px !important;
+}
+
+/* Scroll suave nas tabelas */
+.table-responsive {
+  scroll-behavior: smooth;
+}
+
+.table-responsive::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Sticky header nas tabelas */
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Animação de pulso para eventos em andamento */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.border-success.shadow-lg {
+  animation: pulse 2s infinite;
+}
+
+/* Relógio digital */
+#relogio-atual {
+  font-family: 'Courier New', monospace;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Melhorias nos badges */
+.badge {
+  font-weight: 600;
+  padding: 0.5em 0.75em;
+}
+
+/* Progress bars */
+.progress {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  transition: width 0.6s ease;
+}
+
+/* Cards de horário */
+.card.opacity-50 {
+  background-color: #f8f9fa;
+}
+
+/* Responsividade */
+@media (max-width: 768px) {
+  .timeline-item .col-md-2 {
+    margin-bottom: 1rem;
+  }
+  
+  #relogio-atual {
+    font-size: 2rem !important;
+  }
+  
+  .display-4 {
+    font-size: 2.5rem !important;
+  }
+}
+
+/* Tabela de Disponibilidade Detalhada */
+.table-bordered th,
+.table-bordered td {
+  border: 1px solid #dee2e6 !important;
+}
+
+.table-bordered thead th {
+  background-color: #343a40;
+  color: white;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.table-bordered tbody tr:hover {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.table-success {
+  background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+.table-warning {
+  background-color: rgba(255, 193, 7, 0.15) !important;
+}
+
+.table-danger {
+  background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.table-bordered td {
+  padding: 0.75rem 0.5rem;
+}
+
+/* Botões pequenos de info */
+.btn-outline-info.p-0 {
+  border-width: 1px;
+  line-height: 1;
+}
+
+/* Sticky header melhorado */
+.table-responsive .sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Animação hover nas células */
+.table-bordered tbody td {
+  transition: all 0.2s ease;
+  cursor: default;
+}
+
+.table-bordered tbody td:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+/* Badges na tabela */
+.table-bordered .badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+}

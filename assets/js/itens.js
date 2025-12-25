@@ -75,10 +75,26 @@ class Itens {
     const dateInput = document.getElementById("itens-date");
     if (dateInput) {
       dateInput.addEventListener("change", () => {
-        this.selectedDate = new Date(dateInput.value);
+        const dateValue = dateInput.value; // formato: YYYY-MM-DD
+        if (dateValue) {
+          this.selectedDate = this.parseDataLocal(dateValue);
+        }
         this.render();
       });
     }
+  }
+
+  parseDataLocal(isoDateStr) {
+    const [ano, mes, dia] = isoDateStr.split("-").map(Number);
+    return new Date(ano, mes - 1, dia);
+  }
+
+  isSameDay(date1, date2) {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
   }
 
   renderTableRows() {
@@ -88,16 +104,12 @@ class Itens {
     const agora = new Date();
     const BUFFER_LOGISTICA_MS = 40 * 60 * 1000; // 40 minutos
     
-    // Data selecionada (sem hora)
-    const dataSelecionada = new Date(this.selectedDate);
-    dataSelecionada.setHours(0, 0, 0, 0);
-    
-    // Data de hoje (sem hora)
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    
     eventos.forEach((evento) => {
       if (evento.status === "finalizado") return;
+      
+      // Verificar se o evento é do dia selecionado
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
+      if (!this.isSameDay(dataEvento, this.selectedDate)) return;
       
       // Verificar se o evento ainda está em uso (incluindo buffer de 40 min)
       const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
@@ -105,12 +117,8 @@ class Itens {
       const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
       const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
       
-      // Data do evento (sem hora)
-      const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-      
-      // Só considera alugado se:
-      // 1. O evento é para a data selecionada (ou antes) E ainda não passou (com buffer)
-      if (dataEvento <= dataSelecionada && agora < fimComBuffer) {
+      // Só considera alugado se ainda não passou o horário (com buffer)
+      if (agora < fimComBuffer) {
         evento.itens.forEach((itemEvento) => {
           if (!quantidadesAlugadas[itemEvento.id]) {
             quantidadesAlugadas[itemEvento.id] = 0;

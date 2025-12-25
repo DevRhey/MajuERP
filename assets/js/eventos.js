@@ -59,19 +59,32 @@ class Eventos {
     const dateInput = document.getElementById("eventos-date");
     if (dateInput) {
       dateInput.addEventListener("change", () => {
-        this.selectedDate = new Date(dateInput.value);
+        const dateValue = dateInput.value; // formato: YYYY-MM-DD
+        if (dateValue) {
+          this.selectedDate = this.parseDataLocal(dateValue);
+        }
         this.render();
       });
     }
   }
 
+  parseDataLocal(isoDateStr) {
+    const [ano, mes, dia] = isoDateStr.split("-").map(Number);
+    return new Date(ano, mes - 1, dia);
+  }
+
+  isSameDay(date1, date2) {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  }
+
   renderEventosCards() {
     const eventos = this.eventos.filter(evento => {
-      const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
-      const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-      const dataSelecionada = new Date(this.selectedDate);
-      dataSelecionada.setHours(0, 0, 0, 0);
-      return dataEvento.getTime() === dataSelecionada.getTime();
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
+      return this.isSameDay(dataEvento, this.selectedDate);
     });
 
     if (eventos.length === 0) {
@@ -186,11 +199,8 @@ class Eventos {
     }
 
     return this.eventos.filter(evento => {
-      const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
-      const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
-      const dataSelecionada = new Date(this.selectedDate);
-      dataSelecionada.setHours(0, 0, 0, 0);
-      return dataEvento.getTime() === dataSelecionada.getTime();
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
+      return this.isSameDay(dataEvento, this.selectedDate);
     })
       .map((evento) => {
         const cliente = this.clientes.find((c) => c.id === evento.clienteId);

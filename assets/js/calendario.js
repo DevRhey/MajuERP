@@ -224,6 +224,7 @@ class Calendario {
                                     <h6 class="mb-1">${evento.horaInicio} - ${
                       evento.horaFim
                     }</h6>
+                                    <p class="mb-1"><strong>Evento:</strong> ${evento.nome || "Sem nome"}</p>
                                     <p class="mb-1"><strong>Cliente:</strong> ${cliente}</p>
                                     <div class="mb-2">
                                         <strong>Itens Alugados:</strong>

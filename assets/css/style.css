@@ -212,10 +212,15 @@ body {
   color: white;
 }
 
+.modal-body {
+  color: #212529;
+}
+
 /* List Group Styles */
 .list-group-item {
   border-left: none;
   border-right: none;
+  color: #212529;
 }
 
 .list-group-item:first-child {
@@ -224,6 +229,14 @@ body {
 
 .list-group-item:last-child {
   border-bottom: none;
+}
+
+.list-group-item li {
+  color: #212529 !important;
+}
+
+.list-group-item small {
+  color: #6c757d !important;
 }
 
 /* Chart Styles */
@@ -278,23 +291,36 @@ canvas {
 .list-group-item {
   background-color: #fff;
   border: 1px solid rgba(0, 0, 0, 0.125);
+  color: #212529;
 }
 
 .list-group-item.status-aguardando {
   border-left: 4px solid #ffc107;
+  background-color: #fffbf0;
 }
 
 .list-group-item.status-andamento {
   border-left: 4px solid #28a745;
+  background-color: #f0f8f5;
 }
 
 .list-group-item.status-finalizado {
   border-left: 4px solid #6c757d;
+  background-color: #f8f9fa;
 }
 
 .list-group-item .badge {
   font-size: 0.875rem;
   padding: 0.5em 0.75em;
+}
+
+.list-group-item ul li {
+  color: #212529;
+  font-weight: 500;
+}
+
+.list-group-item ul li small {
+  color: #6c757d;
 }
 
 .badge.status-aguardando {
@@ -517,4 +543,54 @@ canvas {
 .table-bordered .badge {
   font-size: 0.75rem;
   font-weight: 600;
+}
+/* Eventos Cards */
+.transition-hover {
+  transition: all 0.3s ease;
+}
+
+.transition-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15) !important;
+}
+
+.card-header.bg-gradient {
+  background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+}
+
+.card-header .badge {
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.card-body .badge {
+  font-size: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-body .alert {
+  border-radius: 0.4rem;
+  border: none;
+}
+
+#eventos-container {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-body strong {
+  font-size: 1.1rem;
 }

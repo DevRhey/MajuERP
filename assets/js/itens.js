@@ -3,6 +3,7 @@
 class Itens {
   constructor() {
     this.itens = Storage.get("itens") || [];
+    this.selectedDate = new Date();
     this.setupStorageListener();
   }
 
@@ -28,13 +29,20 @@ class Itens {
             <div class="container">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2>Gerenciamento de Itens</h2>
-                    <div>
-                        <button class="btn btn-warning me-2" onclick="app.modules.itens.corrigirEstado()">
-                            <i class="bi bi-tools"></i> Corrigir Estado
-                        </button>
-                        <button class="btn btn-primary" onclick="app.modules.itens.showForm()">
-                            <i class="bi bi-plus-circle"></i> Novo Item
-                        </button>
+                    <div class="d-flex gap-3 align-items-center">
+                        <div style="min-width: 150px;">
+                            <label class="form-label mb-2"><small>Filtrar por data:</small></label>
+                            <input type="date" class="form-control" id="itens-date" 
+                                   value="${this.selectedDate.toISOString().split("T")[0]}">
+                        </div>
+                        <div>
+                            <button class="btn btn-warning me-2" onclick="app.modules.itens.corrigirEstado()">
+                                <i class="bi bi-tools"></i> Corrigir Estado
+                            </button>
+                            <button class="btn btn-primary" onclick="app.modules.itens.showForm()">
+                                <i class="bi bi-plus-circle"></i> Novo Item
+                            </button>
+                        </div>
                     </div>
                 </div>
                 
@@ -63,14 +71,29 @@ class Itens {
                 </div>
             </div>
         `;
+    this.setupDatePicker();
+  }
+
+  setupDatePicker() {
+    const dateInput = document.getElementById("itens-date");
+    if (dateInput) {
+      dateInput.addEventListener("change", () => {
+        this.selectedDate = new Date(dateInput.value);
+        this.render();
+      });
+    }
   }
 
   renderTableRows() {
-    // Calcular quantidades alugadas baseadas nos eventos ativos
+    // Calcular quantidades alugadas baseadas nos eventos da data selecionada
     const eventos = Storage.get("eventos") || [];
     const quantidadesAlugadas = {};
     const agora = new Date();
     const BUFFER_LOGISTICA_MS = 40 * 60 * 1000; // 40 minutos
+    
+    // Data selecionada (sem hora)
+    const dataSelecionada = new Date(this.selectedDate);
+    dataSelecionada.setHours(0, 0, 0, 0);
     
     // Data de hoje (sem hora)
     const hoje = new Date();
@@ -89,8 +112,8 @@ class Itens {
       const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
       
       // Só considera alugado se:
-      // 1. O evento é para hoje (ou antes) E ainda não passou (com buffer)
-      if (dataEvento <= hoje && agora < fimComBuffer) {
+      // 1. O evento é para a data selecionada (ou antes) E ainda não passou (com buffer)
+      if (dataEvento <= dataSelecionada && agora < fimComBuffer) {
         evento.itens.forEach((itemEvento) => {
           if (!quantidadesAlugadas[itemEvento.id]) {
             quantidadesAlugadas[itemEvento.id] = 0;

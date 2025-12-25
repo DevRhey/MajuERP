@@ -3,6 +3,7 @@
 class Eventos {
   constructor() {
     this.sync();
+    this.selectedDate = new Date();
     this.atualizarStatusEventos();
     this.statusInterval = setInterval(() => this.atualizarStatusEventos(), 10000);
     this.setupStorageListener();
@@ -34,9 +35,16 @@ class Eventos {
       <div class="container">
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h2>Gerenciamento de Eventos</h2>
-          <button class="btn btn-primary" onclick="app.modules.eventos.showForm()">
-            <i class="bi bi-plus-circle"></i> Novo Evento
-          </button>
+          <div class="d-flex gap-3 align-items-center">
+            <div style="min-width: 150px;">
+              <label class="form-label mb-2"><small>Filtrar por data:</small></label>
+              <input type="date" class="form-control" id="eventos-date" 
+                     value="${this.selectedDate.toISOString().split("T")[0]}">
+            </div>
+            <button class="btn btn-primary" onclick="app.modules.eventos.showForm()">
+              <i class="bi bi-plus-circle"></i> Novo Evento
+            </button>
+          </div>
         </div>
         <div class="card">
           <div class="card-body">
@@ -64,6 +72,17 @@ class Eventos {
         </div>
       </div>
     `;
+    this.setupDatePicker();
+  }
+
+  setupDatePicker() {
+    const dateInput = document.getElementById("eventos-date");
+    if (dateInput) {
+      dateInput.addEventListener("change", () => {
+        this.selectedDate = new Date(dateInput.value);
+        this.render();
+      });
+    }
   }
 
   renderTableRows() {
@@ -71,7 +90,13 @@ class Eventos {
       return `<tr><td colspan="9" class="text-center text-muted">Nenhum evento cadastrado.</td></tr>`;
     }
 
-    return this.eventos
+    return this.eventos.filter(evento => {
+      const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
+      const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+      const dataSelecionada = new Date(this.selectedDate);
+      dataSelecionada.setHours(0, 0, 0, 0);
+      return dataEvento.getTime() === dataSelecionada.getTime();
+    })
       .map((evento) => {
         const cliente = this.clientes.find((c) => c.id === evento.clienteId);
         const statusClass = this.getStatusClass(evento.status);

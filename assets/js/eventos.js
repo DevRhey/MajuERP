@@ -101,11 +101,11 @@ class Eventos {
       return `
         <div class="col-md-6 col-lg-4 mb-4">
           <div class="card h-100 shadow-sm border-0 transition-hover">
-            <div class="card-header bg-gradient text-white">
+            <div class="card-header bg-primary text-white">
               <div class="d-flex justify-content-between align-items-start">
                 <div>
-                  <h5 class="card-title mb-1">${evento.nome || "Evento sem nome"}</h5>
-                  <small class="opacity-75">${cliente ? cliente.nome : "Cliente não encontrado"}</small>
+                  <h5 class="card-title mb-1 text-white">${evento.nome || "Evento sem nome"}</h5>
+                  <small class="text-white opacity-75">${cliente ? cliente.nome : "Cliente não encontrado"}</small>
                 </div>
                 <span class="badge ${statusClass}">${statusText}</span>
               </div>

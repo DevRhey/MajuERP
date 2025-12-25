@@ -384,43 +384,65 @@ class Itens {
     if (!item) return null;
 
     const eventos = Storage.get("eventos") || [];
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const agora = new Date();
+    const BUFFER_LOGISTICA_MS = 40 * 60 * 1000; // 40 minutos
 
-    // Filtrar eventos futuros que usam este item ESPECIFICAMENTE
-    const eventosFuturos = eventos.filter((evento) => {
-      const dataEvento = new Date(evento.dataInicio);
+    // Filtrar eventos que usam este item ESPECIFICAMENTE e ainda estão ativos
+    const eventosAtivos = eventos.filter((evento) => {
+      if (evento.status === "finalizado") return false;
+      
       // Verificar se o item está sendo usado neste evento
       const usaEsteItem = evento.itens.some(ei => ei.id === itemId);
-      return dataEvento >= hoje && evento.status !== "finalizado" && usaEsteItem;
+      if (!usaEsteItem) return false;
+
+      // Verificar se o evento está ativo (não passou ainda, considerando buffer)
+      const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
+      const [horaFim, minFim] = evento.horaFim.split(':').map(Number);
+      const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
+      const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
+      
+      return agora < fimComBuffer;
     });
 
-    if (eventosFuturos.length === 0) {
+    if (eventosAtivos.length === 0) {
       return "Disponível agora";
     }
 
-    // Ordenar eventos por data
-    eventosFuturos.sort(
-      (a, b) => new Date(a.dataInicio) - new Date(b.dataInicio)
-    );
+    // Ordenar eventos por data e hora de fim
+    eventosAtivos.sort((a, b) => {
+      const [anoA, mesA, diaA] = a.dataInicio.split('-').map(Number);
+      const [horaFimA, minFimA] = a.horaFim.split(':').map(Number);
+      const fimA = new Date(anoA, mesA - 1, diaA, horaFimA, minFimA, 0);
+      
+      const [anoB, mesB, diaB] = b.dataInicio.split('-').map(Number);
+      const [horaFimB, minFimB] = b.horaFim.split(':').map(Number);
+      const fimB = new Date(anoB, mesB - 1, diaB, horaFimB, minFimB, 0);
+      
+      return fimB - fimA; // Ordenar do mais tardio para o mais cedo
+    });
 
-    // Encontrar o primeiro intervalo disponível
-    let dataAtual = hoje;
-    for (const evento of eventosFuturos) {
-      const dataEvento = new Date(evento.dataInicio);
-      const [horaFim] = evento.horaFim.split(":").map(Number);
+    // Pegar o evento que termina por último
+    const ultimoEvento = eventosAtivos[0];
+    const [ano, mes, dia] = ultimoEvento.dataInicio.split('-').map(Number);
+    const [horaFim, minFim] = ultimoEvento.horaFim.split(':').map(Number);
+    const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
+    const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
 
-      // Se houver um intervalo entre a data atual e o evento
-      if (dataEvento > dataAtual) {
-        return `Disponível em ${DateUtils.formatDate(dataAtual)}`;
-      }
-
-      // Atualizar a data atual para o fim do evento
-      dataAtual = new Date(dataEvento);
-      dataAtual.setHours(horaFim + 1, 0, 0, 0);
+    // Formatar data de disponibilidade
+    const dataDisponibilidade = new Date(fimComBuffer);
+    const horaDisp = `${String(dataDisponibilidade.getHours()).padStart(2, '0')}:${String(dataDisponibilidade.getMinutes()).padStart(2, '0')}`;
+    
+    // Se for hoje, mostrar apenas a hora
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const dataEvt = new Date(dataDisponibilidade);
+    dataEvt.setHours(0, 0, 0, 0);
+    
+    if (dataEvt.getTime() === hoje.getTime()) {
+      return `Disponível às ${horaDisp}`;
+    } else {
+      return `Disponível em ${DateUtils.formatDate(dataDisponibilidade)} às ${horaDisp}`;
     }
-
-    return `Disponível em ${DateUtils.formatDate(dataAtual)}`;
   }
 }
 

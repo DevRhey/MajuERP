@@ -36,9 +36,6 @@ class Itens {
                                    value="${this.selectedDate.toISOString().split("T")[0]}">
                         </div>
                         <div>
-                            <button class="btn btn-warning me-2" onclick="app.modules.itens.corrigirEstado()">
-                                <i class="bi bi-tools"></i> Corrigir Estado
-                            </button>
                             <button class="btn btn-primary" onclick="app.modules.itens.showForm()">
                                 <i class="bi bi-plus-circle"></i> Novo Item
                             </button>
@@ -366,17 +363,6 @@ class Itens {
 
     const disponiveis = item.quantidadeTotal - quantidadeAlugada;
     return disponiveis >= quantidade;
-  }
-
-  corrigirEstado() {
-    // Remover a propriedade quantidadeAlugada de todos os itens
-    // pois agora será calculada dinamicamente
-    this.itens.forEach((item) => {
-      delete item.quantidadeAlugada;
-    });
-    Storage.save("itens", this.itens);
-    this.render();
-    UI.showAlert("Estado dos itens corrigido com sucesso!");
   }
 
   verificarProximaDisponibilidade(itemId) {

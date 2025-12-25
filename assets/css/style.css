@@ -594,3 +594,142 @@ canvas {
 .card-body strong {
   font-size: 1.1rem;
 }
+
+/* Timeline de Eventos Melhorado */
+.timeline-wrapper {
+  position: relative;
+  padding: 20px 0;
+}
+
+.timeline-events {
+  position: relative;
+  padding-left: 50px;
+}
+
+.timeline-events::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #0d6efd 0%, #6610f2 100%);
+  border-radius: 2px;
+}
+
+.timeline-event {
+  position: relative;
+  margin-bottom: 25px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  border-left: 4px solid #6c757d;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transition: all 0.3s ease;
+}
+
+.timeline-event:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  transform: translateX(5px);
+}
+
+.timeline-event-active {
+  box-shadow: 0 4px 20px rgba(40, 167, 69, 0.3);
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0%, 100% {
+    border-left-width: 4px;
+  }
+  50% {
+    border-left-width: 6px;
+  }
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -38px;
+  top: 20px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 2;
+  border: 3px solid white;
+}
+
+.timeline-content {
+  position: relative;
+}
+
+.timeline-time {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #495057;
+}
+
+.timeline-now-marker {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+}
+
+.timeline-now-marker::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #dc3545, transparent);
+  animation: pulse-line 2s infinite;
+}
+
+.timeline-now-marker .badge {
+  position: relative;
+  margin-left: 60px;
+  z-index: 11;
+}
+
+@keyframes pulse-line {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.pulse-animation {
+  animation: pulse-badge 1.5s infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+  }
+}
+
+.progress-bar-animated {
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+  0% {
+    background-position: 1rem 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}

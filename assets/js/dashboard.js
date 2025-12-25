@@ -406,21 +406,33 @@ class Dashboard {
   getFaturamentoEstimado() {
     const hoje = new Date();
     return this.eventos
-      .filter((evento) => new Date(evento.dataInicio) >= hoje)
+      .filter((evento) => {
+        const dataEvento = this.parseDataLocal(evento.dataInicio);
+        return this.isDateAfterOrEqual(dataEvento, hoje);
+      })
       .reduce((total, evento) => total + evento.valorTotal, 0);
   }
 
   getTotalProximosEventos() {
     const hoje = new Date();
-    return this.eventos.filter((evento) => new Date(evento.dataInicio) >= hoje)
-      .length;
+    return this.eventos.filter((evento) => {
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
+      return this.isDateAfterOrEqual(dataEvento, hoje);
+    }).length;
   }
 
   renderProximosEventos() {
     const hoje = new Date();
     return this.eventos
-      .filter((evento) => new Date(evento.dataInicio) >= hoje)
-      .sort((a, b) => new Date(a.dataInicio) - new Date(b.dataInicio))
+      .filter((evento) => {
+        const dataEvento = this.parseDataLocal(evento.dataInicio);
+        return this.isDateAfterOrEqual(dataEvento, hoje);
+      })
+      .sort((a, b) => {
+        const dataA = this.parseDataLocal(a.dataInicio);
+        const dataB = this.parseDataLocal(b.dataInicio);
+        return dataA - dataB;
+      })
       .slice(0, 5)
       .map((evento) => {
         const cliente = this.clientes.find((c) => c.id === evento.clienteId);
@@ -570,7 +582,7 @@ class Dashboard {
     const eventosPorMes = new Array(12).fill(0);
 
     this.eventos.forEach((evento) => {
-      const data = new Date(evento.dataInicio);
+      const data = this.parseDataLocal(evento.dataInicio);
       const mes = data.getMonth();
       eventosPorMes[mes]++;
     });
@@ -666,6 +678,13 @@ class Dashboard {
       date1.getMonth() === date2.getMonth() &&
       date1.getDate() === date2.getDate()
     );
+  }
+
+  // Compara se data1 >= data2 (apenas dia, ignorando hora)
+  isDateAfterOrEqual(date1, date2) {
+    const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
+    const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
+    return d1 >= d2;
   }
 
   renderEventosPorStatus(status) {
@@ -797,8 +816,11 @@ class Dashboard {
   atualizarDashboard() {
     const dateInput = document.getElementById("dashboard-date");
     if (dateInput) {
-      // Atualizar a data selecionada
-      this.selectedDate = new Date(dateInput.value);
+      // Atualizar a data selecionada (usando parseDataLocal para evitar problemas de timezone)
+      const dateValue = dateInput.value; // formato: YYYY-MM-DD
+      if (dateValue) {
+        this.selectedDate = this.parseDataLocal(dateValue);
+      }
 
       // Recarregar dados do localStorage
       this.clientes = Storage.get("clientes") || [];
@@ -984,99 +1006,120 @@ class Dashboard {
     const isHoje = this.isSameDay(agora, dataSelecionada);
 
     return `
-      <div class="timeline-container">
+    <div class="timeline-wrapper position-relative">
+      <div class="timeline-events">
         ${eventosDoDia.map((evento, index) => {
           const cliente = this.clientes.find((c) => c.id === evento.clienteId);
           const isAtivo = isHoje && evento.status === 'andamento';
           const isPendente = isHoje && evento.status === 'aguardando' && evento.horaInicio > horaAtual;
           const isFinalizado = evento.status === 'finalizado';
           
-          let badgeClass = 'bg-secondary';
-          let iconClass = 'bi-check-circle';
-          let cardClass = '';
+          let statusColor = '#6c757d';
+          let iconClass = 'bi-check-circle-fill';
           
           if (isAtivo) {
-            badgeClass = 'bg-success';
+            statusColor = '#28a745';
             iconClass = 'bi-play-circle-fill';
-            cardClass = 'border-success shadow-lg';
           } else if (isPendente) {
-            badgeClass = 'bg-warning';
+            statusColor = '#ffc107';
             iconClass = 'bi-clock-fill';
-            cardClass = 'border-warning';
-          } else if (isFinalizado) {
-            badgeClass = 'bg-secondary';
-            iconClass = 'bi-check-circle-fill';
-            cardClass = 'opacity-75';
           }
           
-          // Calcular horário de liberação (término + 40 min)
+          // Calcular horário de liberação
           const [horaF, minF] = evento.horaFim.split(':').map(Number);
           const fimEvento = new Date();
           fimEvento.setHours(horaF, minF, 0);
           const fimComBuffer = new Date(fimEvento.getTime() + (40 * 60 * 1000));
           const horaLiberacao = `${String(fimComBuffer.getHours()).padStart(2, '0')}:${String(fimComBuffer.getMinutes()).padStart(2, '0')}`;
 
+          // Calcular progresso se for hoje
+          let progressoBar = '';
+          if (isHoje && !isFinalizado) {
+            const [horaI, minI] = evento.horaInicio.split(':').map(Number);
+            const inicioMinutos = horaI * 60 + minI;
+            const fimMinutos = horaF * 60 + minF;
+            const agoraMinutos = agora.getHours() * 60 + agora.getMinutes();
+            
+            let progresso = 0;
+            let progressoTexto = '';
+            
+            if (agoraMinutos < inicioMinutos) {
+              const totalAteInicio = inicioMinutos - agoraMinutos;
+              progressoTexto = `Começa em ${Math.floor(totalAteInicio / 60)}h ${totalAteInicio % 60}min`;
+              progresso = 0;
+            } else if (agoraMinutos >= inicioMinutos && agoraMinutos <= fimMinutos) {
+              const totalDuracao = fimMinutos - inicioMinutos;
+              const decorrido = agoraMinutos - inicioMinutos;
+              progresso = (decorrido / totalDuracao) * 100;
+              const restante = fimMinutos - agoraMinutos;
+              progressoTexto = `Termina em ${Math.floor(restante / 60)}h ${restante % 60}min`;
+            } else {
+              progresso = 100;
+              progressoTexto = 'Finalizado';
+            }
+            
+            progressoBar = `
+              <div class="mb-2">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <small class="text-muted">${progressoTexto}</small>
+                  <small class="text-muted">${Math.round(progresso)}%</small>
+                </div>
+                <div class="progress" style="height: 6px;">
+                  <div class="progress-bar ${isAtivo ? 'bg-success progress-bar-striped progress-bar-animated' : 'bg-warning'}" 
+                       role="progressbar" style="width: ${progresso}%"></div>
+                </div>
+              </div>
+            `;
+          }
+
           return `
-            <div class="timeline-item mb-3">
-              <div class="card ${cardClass}">
-                <div class="card-body">
-                  <div class="row align-items-center">
-                    <div class="col-md-2 text-center">
-                      <div class="timeline-time">
-                        <i class="bi ${iconClass} fs-3 ${badgeClass === 'bg-success' ? 'text-success' : badgeClass === 'bg-warning' ? 'text-warning' : 'text-secondary'}"></i>
-                        <div class="mt-2">
-                          <strong class="d-block">${evento.horaInicio}</strong>
-                          <small class="text-muted">até ${evento.horaFim}</small>
-                          ${!isFinalizado ? `<br><small class="text-info"><i class="bi bi-truck"></i> Liberação: ${horaLiberacao}</small>` : ''}
-                        </div>
-                        <span class="badge ${badgeClass} mt-2">${this.getStatusText(evento.status)}</span>
-                      </div>
-                    </div>
-                    <div class="col-md-10">
-                      <div class="d-flex justify-content-between align-items-start">
-                        <div class="flex-grow-1">
-                          <h5 class="mb-2">
-                            <i class="bi bi-person-circle me-2"></i>
-                            ${cliente ? cliente.nome : 'Cliente não encontrado'}
-                          </h5>
-                          <div class="row">
-                            <div class="col-md-8">
-                              <strong><i class="bi bi-box-seam me-2"></i>Itens:</strong>
-                              <ul class="list-unstyled ms-4 mb-0">
-                                ${evento.itens.map(itemEvento => {
-                                  const item = this.itens.find(i => i.id === itemEvento.id);
-                                  return item ? `
-                                    <li>
-                                      <i class="bi bi-check2 text-success me-1"></i>
-                                      ${item.nome} <span class="badge bg-light text-dark">${itemEvento.quantidade}x</span>
-                                    </li>
-                                  ` : '';
-                                }).join('')}
-                              </ul>
-                            </div>
-                            <div class="col-md-4 text-end">
-                              <div class="mb-2">
-                                <strong>Valor Total:</strong><br>
-                                <span class="fs-4 text-primary">R$ ${evento.valorTotal.toFixed(2)}</span>
-                              </div>
-                              ${evento.observacoes ? `
-                                <small class="text-muted">
-                                  <i class="bi bi-chat-left-text me-1"></i>
-                                  ${evento.observacoes}
-                                </small>
-                              ` : ''}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+            <div class="timeline-event ${isAtivo ? 'timeline-event-active' : ''}" style="border-left-color: ${statusColor};">
+              <div class="timeline-marker" style="background-color: ${statusColor};">
+                <i class="bi ${iconClass} text-white"></i>
+              </div>
+              <div class="timeline-content">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                  <div>
+                    <span class="timeline-time">${evento.horaInicio} - ${evento.horaFim}</span>
+                    <span class="badge ms-2" style="background-color: ${statusColor};">${this.getStatusText(evento.status)}</span>
                   </div>
+                  <small class="text-muted"><i class="bi bi-truck"></i> Liberação: ${horaLiberacao}</small>
+                </div>
+                
+                ${progressoBar}
+                
+                <h6 class="mb-2">
+                  <i class="bi bi-person-circle me-2 text-primary"></i>
+                  ${cliente ? cliente.nome : 'Cliente não encontrado'}
+                </h6>
+                
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                  ${evento.itens.map(itemEvento => {
+                    const item = this.itens.find(i => i.id === itemEvento.id);
+                    return item ? `
+                      <span class="badge bg-light text-dark border">
+                        <i class="bi bi-box-seam me-1"></i>${item.nome} <strong>×${itemEvento.quantidade}</strong>
+                      </span>
+                    ` : '';
+                  }).join('')}
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="text-primary fw-bold">
+                    <i class="bi bi-cash-coin me-1"></i>R$ ${evento.valorTotal.toFixed(2)}
+                  </span>
+                  ${evento.observacoes ? `
+                    <small class="text-muted text-truncate" style="max-width: 300px;" title="${evento.observacoes}">
+                      <i class="bi bi-chat-left-text me-1"></i>${evento.observacoes}
+                    </small>
+                  ` : ''}
                 </div>
               </div>
             </div>
           `;
         }).join('')}
       </div>
+    </div>
     `;
   }
 
@@ -1298,10 +1341,10 @@ class Dashboard {
         <table class="table table-bordered table-hover mb-0" style="position: relative;">
           <thead class="table-dark sticky-top">
             <tr>
-              <th style="min-width: 200px; position: sticky; left: 0; z-index: 10; background-color: #212529;" class="align-middle">
+              <th style="min-width: 120px; max-width: 120px; position: sticky; left: 0; z-index: 10; background-color: #212529;" class="align-middle">
                 <i class="bi bi-box-seam me-2"></i>Item
               </th>
-              <th class="text-center align-middle" style="position: sticky; left: 200px; z-index: 10; background-color: #212529;">Total</th>
+              <th class="text-center align-middle" style="position: sticky; left: 120px; z-index: 10; background-color: #212529; width: 60px;">Total</th>
               ${horarios.map(h => `
                 <th class="text-center align-middle ${h.passou ? 'bg-secondary bg-opacity-25' : ''}" style="min-width: 100px;">
                   <div class="small">${h.inicio}</div>
@@ -1318,7 +1361,7 @@ class Dashboard {
     this.itens.forEach(item => {
       html += `
         <tr>
-          <td style="position: sticky; left: 0; z-index: 5; background-color: white;">
+          <td style="position: sticky; left: 0; z-index: 5; background-color: white; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">
             <strong>${item.nome}</strong>
             <br>
             <small class="text-muted">
@@ -1326,7 +1369,7 @@ class Dashboard {
               <span class="ms-2">R$ ${item.valorDiaria.toFixed(2)}/dia</span>
             </small>
           </td>
-          <td class="text-center align-middle" style="position: sticky; left: 200px; z-index: 5; background-color: white;">
+          <td class="text-center align-middle" style="position: sticky; left: 120px; z-index: 5; background-color: white; width: 60px;">
             <span class="badge bg-primary">${item.quantidadeTotal}</span>
           </td>
       `;

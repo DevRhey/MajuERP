@@ -51,12 +51,10 @@ class Dashboard {
                                                 <small>Horário atual</small>
                                             </div>
                                             <div class="vr bg-white opacity-50"></div>
-                                            <div>
+                                            <div style="min-width: 150px;">
+                                                <label class="form-label text-white mb-2"><small>Selecionar data:</small></label>
                                                 <input type="date" class="form-control form-control-lg" id="dashboard-date" 
                                                        value="${this.selectedDate.toISOString().split("T")[0]}">
-                                                <button class="btn btn-light btn-sm mt-2 w-100" onclick="app.modules.dashboard.atualizarDashboard()">
-                                                    <i class="bi bi-arrow-clockwise"></i> Atualizar
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
@@ -243,6 +241,9 @@ class Dashboard {
     // Iniciar relógio
     this.iniciarRelogio();
     this.atualizarDataAtual();
+    
+    // Iniciar seletor de data
+    this.setupDatePicker();
     
     // Iniciar auto-refresh
     this.iniciarAutoRefresh();
@@ -710,6 +711,22 @@ class Dashboard {
 
       // Mostrar mensagem de sucesso
       UI.showAlert("Dashboard atualizado com sucesso!", "success");
+    }
+  }
+
+  setupDatePicker() {
+    const dateInput = document.getElementById("dashboard-date");
+    if (dateInput) {
+      // Ao mudar a data, atualizar o dashboard automaticamente
+      dateInput.addEventListener("change", () => {
+        this.atualizarDashboard();
+      });
+
+      // Ao clicar no input, pode selecionar a data
+      dateInput.addEventListener("click", (e) => {
+        e.preventDefault();
+        dateInput.showPicker?.();
+      });
     }
   }
 

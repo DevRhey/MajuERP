@@ -32,9 +32,9 @@ class Eventos {
     this.atualizarStatusEventos();
     const mainContent = document.getElementById("main-content");
     mainContent.innerHTML = `
-      <div class="container">
+      <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
-          <h2>Gerenciamento de Eventos</h2>
+          <h2><i class="bi bi-calendar-event me-2"></i>Gerenciamento de Eventos</h2>
           <div class="d-flex gap-3 align-items-center">
             <div style="min-width: 150px;">
               <label class="form-label mb-2"><small>Filtrar por data:</small></label>
@@ -46,29 +46,9 @@ class Eventos {
             </button>
           </div>
         </div>
-        <div class="card">
-          <div class="card-body">
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Evento</th>
-                    <th>Cliente</th>
-                    <th>Horário</th>
-                    <th>Itens</th>
-                    <th>Valor Total</th>
-                    <th>Pago</th>
-                    <th>Status</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${this.renderTableRows()}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        
+        <div id="eventos-container" class="row">
+          ${this.renderEventosCards()}
         </div>
       </div>
     `;
@@ -83,6 +63,121 @@ class Eventos {
         this.render();
       });
     }
+  }
+
+  renderEventosCards() {
+    const eventos = this.eventos.filter(evento => {
+      const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
+      const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+      const dataSelecionada = new Date(this.selectedDate);
+      dataSelecionada.setHours(0, 0, 0, 0);
+      return dataEvento.getTime() === dataSelecionada.getTime();
+    });
+
+    if (eventos.length === 0) {
+      return `<div class="col-12"><div class="alert alert-info text-center"><i class="bi bi-info-circle me-2"></i>Nenhum evento nesta data. <a href="#" onclick="app.modules.eventos.showForm()" class="alert-link">Criar novo evento</a></div></div>`;
+    }
+
+    return eventos.map((evento) => {
+      const cliente = this.clientes.find((c) => c.id === evento.clienteId);
+      const statusClass = this.getStatusClass(evento.status);
+      const statusText = this.getStatusText(evento.status);
+      const pagamentoInfo = this.getPagamentoInfo(evento);
+      const dataEvento = this.converterDataLocal(evento.dataInicio);
+
+      return `
+        <div class="col-md-6 col-lg-4 mb-4">
+          <div class="card h-100 shadow-sm border-0 transition-hover">
+            <div class="card-header bg-gradient text-white">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h5 class="card-title mb-1">${evento.nome || "Evento sem nome"}</h5>
+                  <small class="opacity-75">${cliente ? cliente.nome : "Cliente não encontrado"}</small>
+                </div>
+                <span class="badge ${statusClass}">${statusText}</span>
+              </div>
+            </div>
+            
+            <div class="card-body">
+              <!-- Data e Hora -->
+              <div class="mb-3 pb-3 border-bottom">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <i class="bi bi-calendar3 text-primary"></i>
+                  <span>${DateUtils.formatDate(dataEvento)}</span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-clock text-primary"></i>
+                  <span>${evento.horaInicio} - ${evento.horaFim}</span>
+                </div>
+              </div>
+
+              <!-- Itens/Brinquedos -->
+              <div class="mb-3 pb-3 border-bottom">
+                <h6 class="mb-2"><i class="bi bi-box-seam me-2 text-success"></i>Itens Contratados</h6>
+                <div class="d-flex flex-wrap gap-2">
+                  ${evento.itens.map(itemEvento => {
+                    const item = this.itens.find(i => i.id === itemEvento.id);
+                    return item ? `
+                      <div class="badge bg-success bg-opacity-10 text-success border border-success p-2">
+                        <i class="bi bi-tag"></i> ${item.nome}
+                        <span class="ms-2 fw-bold">×${itemEvento.quantidade}</span>
+                      </div>
+                    ` : '';
+                  }).join('')}
+                </div>
+              </div>
+
+              <!-- Valores -->
+              <div class="mb-3 pb-3 border-bottom">
+                <div class="row text-center">
+                  <div class="col-6">
+                    <small class="text-muted d-block">Total</small>
+                    <strong class="fs-6 text-primary">R$ ${evento.valorTotal.toFixed(2)}</strong>
+                  </div>
+                  <div class="col-6">
+                    <small class="text-muted d-block">Pago</small>
+                    <strong class="fs-6 ${pagamentoInfo.restante > 0 ? 'text-warning' : 'text-success'}">
+                      R$ ${pagamentoInfo.totalPago.toFixed(2)}
+                    </strong>
+                  </div>
+                </div>
+                ${pagamentoInfo.restante > 0 ? `
+                  <div class="mt-2 alert alert-warning mb-0 py-2">
+                    <small><i class="bi bi-exclamation-triangle me-2"></i>Falta: <strong>R$ ${pagamentoInfo.restante.toFixed(2)}</strong></small>
+                  </div>
+                ` : `
+                  <div class="mt-2 alert alert-success mb-0 py-2">
+                    <small><i class="bi bi-check-circle me-2"></i>Pagamento completo</small>
+                  </div>
+                `}
+              </div>
+
+              <!-- Observações (se existirem) -->
+              ${evento.observacoes ? `
+                <div class="mb-3 pb-3 border-bottom">
+                  <small class="text-muted d-block mb-1"><i class="bi bi-chat-left-text me-1"></i>Observações</small>
+                  <small class="text-dark">${evento.observacoes}</small>
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="card-footer bg-light">
+              <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-success flex-grow-1" onclick="app.modules.eventos.registrarPagamento(${evento.id})" title="Registrar Pagamento">
+                  <i class="bi bi-cash-coin me-1"></i>Pagamento
+                </button>
+                <button class="btn btn-sm btn-info" onclick="app.modules.eventos.editEvento(${evento.id})" title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="app.modules.eventos.deleteEvento(${evento.id})" title="Deletar">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
   }
 
   renderTableRows() {

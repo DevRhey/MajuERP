@@ -156,56 +156,66 @@ class Dashboard {
                     </div>
                 </div>
 
-                <!-- Itens Disponíveis e Alugados -->
+                <!-- Itens Disponíveis, Alugados e Para Retirar -->
                 <div class="row mb-4">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="card shadow-sm h-100">
                             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Itens Disponíveis Agora</h5>
-                                <span class="badge bg-light text-dark">${this.getTotalItensDisponiveis()} itens</span>
+                                <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Disponíveis Agora</h5>
+                                <span class="badge bg-light text-dark">${this.getTotalItensDisponiveis()}</span>
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                    <table class="table table-hover mb-0">
+                                    <table class="table table-hover table-sm mb-0">
                                         <thead class="sticky-top bg-light">
                                             <tr>
                                                 <th>Item</th>
-                                                <th>Total</th>
-                                                <th>Alugados</th>
-                                                <th>Disponíveis</th>
-                                                <th>Valor/dia</th>
+                                                <th class="text-center">Disp.</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${this.renderItensDisponiveis()}
+                                            ${this.renderItensDisponiveisCompacto()}
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="card shadow-sm h-100">
                             <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0"><i class="bi bi-clock me-2"></i>Itens Alugados Agora</h5>
-                                <span class="badge bg-light text-dark">${this.getTotalItensAlugados()} itens</span>
+                                <h5 class="mb-0"><i class="bi bi-clock me-2"></i>Alugados Agora</h5>
+                                <span class="badge bg-light text-dark">${this.getTotalItensAlugados()}</span>
                             </div>
                             <div class="card-body p-0">
                                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                    <table class="table table-hover mb-0">
+                                    <table class="table table-hover table-sm mb-0">
                                         <thead class="sticky-top bg-light">
                                             <tr>
                                                 <th>Item</th>
-                                                <th>Total</th>
-                                                <th>Alugados</th>
-                                                <th>Disponíveis</th>
-                                                <th>Valor/dia</th>
+                                                <th class="text-center">Alug.</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            ${this.renderItensAlugados()}
+                                            ${this.renderItensAlugadosCompacto()}
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card shadow-sm h-100">
+                            <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-truck me-2"></i>Para Retirar</h5>
+                                <span class="badge bg-light text-danger">${this.getEventosFinalizadosParaRetirada().length}</span>
+                            </div>
+                            <div class="card-body p-0">
+                                <div style="max-height: 400px; overflow-y: auto;">
+                                    ${this.getEventosFinalizadosParaRetirada().length > 0 ? 
+                                        this.renderEventosFinalizadosCompacto() : 
+                                        '<div class="alert alert-success mb-0 m-3"><small><i class="bi bi-check-circle me-2"></i>Nenhum evento aguardando retirada</small></div>'
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -272,6 +282,20 @@ class Dashboard {
       .join("");
   }
 
+  renderItensDisponiveisCompacto() {
+    return this.getItensDisponiveisHoje()
+      .map((item) => {
+        const disponiveis = item.quantidadeTotal - item.quantidadeAlugada;
+        return `
+          <tr>
+            <td>${item.nome}</td>
+            <td class="text-center"><span class="badge bg-success">${disponiveis}</span></td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
   renderItensAlugados() {
     return this.getItensAlugadosHoje()
       .map((item) => {
@@ -286,6 +310,81 @@ class Dashboard {
         `;
       })
       .join("");
+  }
+
+  renderItensAlugadosCompacto() {
+    return this.getItensAlugadosHoje()
+      .map((item) => {
+        return `
+          <tr>
+            <td>${item.nome}</td>
+            <td class="text-center"><span class="badge bg-warning text-dark">${item.quantidadeAlugada}</span></td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
+  renderEventosFinalizadosCompacto() {
+    const eventos = this.getEventosFinalizadosParaRetirada();
+    
+    return `
+      <div class="list-group list-group-flush">
+        ${eventos.map(evento => {
+          const cliente = this.clientes.find(c => c.id === evento.clienteId);
+          const [horaF, minF] = evento.horaFim.split(':').map(Number);
+          const fimEvento = new Date();
+          fimEvento.setHours(horaF, minF, 0);
+          const fimComBuffer = new Date(fimEvento.getTime() + (40 * 60 * 1000));
+          
+          // Calcular tempo decorrido desde a liberação
+          const agora = new Date();
+          const tempoDecorrido = Math.floor((agora - fimComBuffer) / (60 * 1000)); // em minutos
+          let urgenciaBadge = 'bg-info';
+          
+          if (tempoDecorrido > 120) {
+            urgenciaBadge = 'bg-danger';
+          } else if (tempoDecorrido > 60) {
+            urgenciaBadge = 'bg-warning';
+          }
+
+          return `
+            <div class="list-group-item px-3 py-2">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <strong class="text-truncate" style="max-width: 60%;" title="${cliente ? cliente.nome : 'Cliente não encontrado'}">
+                  <i class="bi bi-geo-alt-fill me-1 text-danger"></i>${cliente ? cliente.nome : 'Cliente não encontrado'}
+                </strong>
+                <span class="badge ${urgenciaBadge}">${tempoDecorrido}min</span>
+              </div>
+              <div class="small text-muted mb-2">
+                <i class="bi bi-clock me-1"></i>${evento.horaInicio}-${evento.horaFim}
+              </div>
+              <div class="small">
+                <strong class="d-block mb-1"><i class="bi bi-box-seam me-1"></i>Itens:</strong>
+                ${evento.itens.map(itemEvento => {
+                  const item = this.itens.find(i => i.id === itemEvento.id);
+                  return item ? `
+                    <div class="ms-3 text-truncate">
+                      <i class="bi bi-check2 text-success me-1"></i>${item.nome} <span class="badge bg-light text-dark">×${itemEvento.quantidade}</span>
+                    </div>
+                  ` : '';
+                }).join('')}
+              </div>
+              ${cliente && cliente.telefone ? `
+                <div class="mt-2 pt-2 border-top">
+                  <small><i class="bi bi-telephone me-1"></i>${cliente.telefone}</small>
+                </div>
+              ` : ''}
+              <div class="mt-2 pt-2 border-top text-center">
+                <button class="btn btn-sm btn-success w-100" onclick="app.modules.dashboard.confirmarRetirada(${evento.id})">
+                  <i class="bi bi-check-circle me-1"></i>Confirmar Retirada
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
   }
 
   getTotalItensDisponiveis() {
@@ -959,6 +1058,194 @@ class Dashboard {
     `;
   }
 
+  getEventosFinalizadosParaRetirada() {
+    const dataSelecionada = this.selectedDate;
+    const agora = new Date();
+    const BUFFER_LOGISTICA_MS = 40 * 60 * 1000; // 40 minutos
+    
+    // Obter lista de eventos já retirados (converter para números para garantir comparação correta)
+    const eventosRetirados = (Storage.get('eventosRetirados') || []).map(id => Number(id));
+    
+    return this.eventos.filter((evento) => {
+      // Filtrar apenas eventos finalizados
+      if (evento.status !== 'finalizado') return false;
+      
+      // Excluir eventos já marcados como retirados (garantir comparação de números)
+      if (eventosRetirados.includes(Number(evento.id))) return false;
+      
+      // Data do evento
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
+      
+      // Verificar se é da data selecionada
+      if (!this.isSameDay(dataEvento, dataSelecionada)) return false;
+      
+      // Calcular horário de fim + buffer
+      const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
+      const [horaFim, minFim] = evento.horaFim.split(':').map(Number);
+      const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
+      const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
+      
+      // Mostrar apenas se já passou o tempo de buffer (ou seja, está pronto para retirada)
+      return agora >= fimComBuffer;
+    }).sort((a, b) => {
+      // Ordenar por horário de fim (mais antigos primeiro = mais urgentes)
+      return a.horaFim.localeCompare(b.horaFim);
+    });
+  }
+
+  confirmarRetirada(eventoId) {
+    console.log('Confirmar Retirada chamado para evento ID:', eventoId);
+    
+    if (!confirm('Confirmar que os equipamentos deste evento foram retirados?')) {
+      return;
+    }
+
+    // Converter para número para garantir consistência
+    eventoId = Number(eventoId);
+    console.log('Evento ID convertido para número:', eventoId);
+
+    // Adicionar evento à lista de retirados
+    let eventosRetirados = Storage.get('eventosRetirados') || [];
+    console.log('Lista atual de eventos retirados:', eventosRetirados);
+    
+    // Converter todos para número
+    eventosRetirados = eventosRetirados.map(id => Number(id));
+    
+    if (!eventosRetirados.includes(eventoId)) {
+      eventosRetirados.push(eventoId);
+      console.log('Adicionando evento à lista. Nova lista:', eventosRetirados);
+      Storage.save('eventosRetirados', eventosRetirados);
+      
+      // Verificar se foi gravado
+      const verificacao = Storage.get('eventosRetirados');
+      console.log('Verificação após Storage.save:', verificacao);
+    }
+
+    // Aguardar um momento para garantir que o Storage foi atualizado
+    setTimeout(() => {
+      // Forçar re-renderização completa do dashboard
+      this.sync();
+      this.render();
+      
+      UI.showAlert('Retirada confirmada com sucesso!', 'success');
+      
+      // Verificar quantos eventos ainda estão na lista
+      const eventosRestantes = this.getEventosFinalizadosParaRetirada();
+      console.log('Eventos restantes após render:', eventosRestantes.length);
+    }, 100);
+  }
+
+  renderEventosFinalizadosRetirada() {
+    const eventos = this.getEventosFinalizadosParaRetirada();
+    
+    if (eventos.length === 0) {
+      return `
+        <div class="alert alert-success mb-0">
+          <i class="bi bi-check-circle me-2"></i>
+          Nenhum evento aguardando retirada de equipamentos no momento.
+        </div>
+      `;
+    }
+
+    return `
+      <div class="row">
+        ${eventos.map(evento => {
+          const cliente = this.clientes.find(c => c.id === evento.clienteId);
+          const [horaF, minF] = evento.horaFim.split(':').map(Number);
+          const fimEvento = new Date();
+          fimEvento.setHours(horaF, minF, 0);
+          const fimComBuffer = new Date(fimEvento.getTime() + (40 * 60 * 1000));
+          const horaLiberacao = `${String(fimComBuffer.getHours()).padStart(2, '0')}:${String(fimComBuffer.getMinutes()).padStart(2, '0')}`;
+          
+          // Calcular tempo decorrido desde a liberação
+          const agora = new Date();
+          const tempoDecorrido = Math.floor((agora - fimComBuffer) / (60 * 1000)); // em minutos
+          let urgenciaClass = 'border-warning';
+          let urgenciaText = 'Normal';
+          let urgenciaBadge = 'bg-warning';
+          
+          if (tempoDecorrido > 120) { // Mais de 2 horas
+            urgenciaClass = 'border-danger';
+            urgenciaText = 'Urgente';
+            urgenciaBadge = 'bg-danger';
+          } else if (tempoDecorrido > 60) { // Mais de 1 hora
+            urgenciaClass = 'border-warning';
+            urgenciaText = 'Atenção';
+            urgenciaBadge = 'bg-warning';
+          } else {
+            urgenciaClass = 'border-info';
+            urgenciaText = 'Recente';
+            urgenciaBadge = 'bg-info';
+          }
+
+          return `
+            <div class="col-md-6 mb-3">
+              <div class="card ${urgenciaClass} border-2 h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <strong><i class="bi bi-geo-alt-fill me-2"></i>${cliente ? cliente.nome : 'Cliente não encontrado'}</strong>
+                  <span class="badge ${urgenciaBadge}">${urgenciaText}</span>
+                </div>
+                <div class="card-body">
+                  <div class="mb-3">
+                    <strong><i class="bi bi-clock me-2 text-primary"></i>Horário do Evento:</strong>
+                    <br>
+                    <span class="ms-4">${evento.horaInicio} - ${evento.horaFim}</span>
+                  </div>
+                  
+                  <div class="mb-3">
+                    <strong><i class="bi bi-truck me-2 text-success"></i>Liberado para retirada desde:</strong>
+                    <br>
+                    <span class="ms-4">${horaLiberacao} (há ${tempoDecorrido} minutos)</span>
+                  </div>
+
+                  ${cliente && cliente.endereco ? `
+                  <div class="mb-3 pb-3 border-bottom">
+                    <strong><i class="bi bi-map me-2 text-danger"></i>Endereço:</strong>
+                    <br>
+                    <span class="ms-4">${cliente.endereco}</span>
+                  </div>
+                  ` : ''}
+
+                  ${cliente && cliente.telefone ? `
+                  <div class="mb-3 pb-3 border-bottom">
+                    <strong><i class="bi bi-telephone me-2 text-info"></i>Telefone:</strong>
+                    <br>
+                    <span class="ms-4">${cliente.telefone}</span>
+                  </div>
+                  ` : ''}
+
+                  <div class="mb-2">
+                    <strong><i class="bi bi-box-seam me-2 text-warning"></i>Itens para Retirar:</strong>
+                  </div>
+                  <ul class="list-group list-group-flush">
+                    ${evento.itens.map(itemEvento => {
+                      const item = this.itens.find(i => i.id === itemEvento.id);
+                      return item ? `
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                          <span>
+                            <i class="bi bi-box text-primary me-2"></i>
+                            ${item.nome}
+                          </span>
+                          <span class="badge bg-primary rounded-pill">${itemEvento.quantidade}x</span>
+                        </li>
+                      ` : '';
+                    }).join('')}
+                  </ul>
+
+                  ${evento.observacoes ? `
+                  <div class="mt-3 alert alert-info py-2 mb-0">
+                    <small><strong><i class="bi bi-info-circle me-2"></i>Obs:</strong> ${evento.observacoes}</small>
+                  </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
   renderDisponibilidadeDetalhada() {
     const horarios = [];
     const agora = new Date();
@@ -970,6 +1257,11 @@ class Dashboard {
       const horaFimStr = `${String(Math.min(hora + 2, 23)).padStart(2, '0')}:00`;
       
       const horaPassed = isHoje && hora < agora.getHours();
+      
+      // Não incluir horários que já passaram se for hoje
+      if (horaPassed) {
+        continue;
+      }
       
       horarios.push({
         inicio: horaStr,

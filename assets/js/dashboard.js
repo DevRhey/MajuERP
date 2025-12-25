@@ -875,9 +875,31 @@ class Dashboard {
     }
 
     // Auto-refresh mais frequente (5s) para dados quase em tempo real
+    // Mas sem re-renderizar toda a página
     this.autoRefreshInterval = setInterval(() => {
-      this.refreshDados();
+      this.refreshDadosSilencioso();
     }, 5000);
+  }
+
+  refreshDadosSilencioso() {
+    // Não atualizar se o usuário não estiver no dashboard
+    if (window.app && window.app.currentPage !== "dashboard") {
+      return;
+    }
+
+    // Recarregar dados do localStorage
+    const eventosAntigos = this.eventos.length;
+    this.clientes = Storage.get("clientes") || [];
+    this.itens = Storage.get("itens") || [];
+    this.eventos = Storage.get("eventos") || [];
+
+    // Verificar se houve mudanças significativas
+    const houveMudancas = eventosAntigos !== this.eventos.length;
+
+    // Se houve mudanças, re-renderizar só as partes necessárias
+    if (houveMudancas) {
+      this.atualizarElementosDinamicos();
+    }
   }
 
   refreshDados() {

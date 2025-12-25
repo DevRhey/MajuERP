@@ -72,6 +72,10 @@ class Itens {
     const agora = new Date();
     const BUFFER_LOGISTICA_MS = 40 * 60 * 1000; // 40 minutos
     
+    // Data de hoje (sem hora)
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
     eventos.forEach((evento) => {
       if (evento.status === "finalizado") return;
       
@@ -81,8 +85,12 @@ class Itens {
       const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
       const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
       
-      // Só considera alugado se ainda não passou 40 min do fim OU se é evento futuro/em andamento
-      if (agora < fimComBuffer || evento.status === 'aguardando' || evento.status === 'andamento') {
+      // Data do evento (sem hora)
+      const dataEvento = new Date(ano, mes - 1, dia, 0, 0, 0, 0);
+      
+      // Só considera alugado se:
+      // 1. O evento é para hoje (ou antes) E ainda não passou (com buffer)
+      if (dataEvento <= hoje && agora < fimComBuffer) {
         evento.itens.forEach((itemEvento) => {
           if (!quantidadesAlugadas[itemEvento.id]) {
             quantidadesAlugadas[itemEvento.id] = 0;
@@ -356,10 +364,12 @@ class Itens {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    // Filtrar eventos futuros que usam este item
+    // Filtrar eventos futuros que usam este item ESPECIFICAMENTE
     const eventosFuturos = eventos.filter((evento) => {
       const dataEvento = new Date(evento.dataInicio);
-      return dataEvento >= hoje && evento.status !== "finalizado";
+      // Verificar se o item está sendo usado neste evento
+      const usaEsteItem = evento.itens.some(ei => ei.id === itemId);
+      return dataEvento >= hoje && evento.status !== "finalizado" && usaEsteItem;
     });
 
     if (eventosFuturos.length === 0) {

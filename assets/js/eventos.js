@@ -172,6 +172,21 @@ class Eventos {
                   <small class="text-dark">${evento.observacoes}</small>
                 </div>
               ` : ''}
+
+              <!-- Recomendações IA (se existirem) -->
+              ${evento._recomendacoes_ia && evento._recomendacoes_ia.length > 0 ? `
+                <div class="mb-3 pb-3 border-bottom">
+                  <div class="alert alert-info mb-0 py-2">
+                    <div class="d-flex align-items-start gap-2">
+                      <i class="bi bi-lightbulb text-info fs-6"></i>
+                      <div>
+                        <small class="fw-bold d-block mb-1">💡 SUGESTÕES IA:</small>
+                        <small class="d-block">${evento._recomendacoes_ia.map(rec => `• ${rec}`).join('<br>')}</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ` : ''}
             </div>
 
             <div class="card-footer bg-light">
@@ -421,6 +436,43 @@ class Eventos {
           pagamentos: isEdit ? evento.pagamentos || [] : [],
         };
 
+        // ===== INTEGRAÇÃO IA: Detector de Conflitos =====
+        if (typeof iaEngine !== 'undefined' && iaEngine.conflictDetector) {
+          const eventosExistentes = this.eventos.filter(e => !isEdit || e.id !== evento.id);
+          const conflitos = iaEngine.conflictDetector.verificarConflitos(eventoData, eventosExistentes);
+          
+          if (conflitos.length > 0) {
+            const conflitosTexto = conflitos.map((c, i) => `${i + 1}. ${c.descricao}`).join('\n');
+            const sugestoes = iaEngine.conflictDetector.sugerirDatasAlternativas(eventoData, eventosExistentes);
+            let mensagem = `⚠️ CONFLITOS DETECTADOS:\n\n${conflitosTexto}\n\n`;
+            
+            if (sugestoes.length > 0) {
+              mensagem += `💡 DATAS ALTERNATIVAS:\n${sugestoes.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n`;
+            }
+            mensagem += `Deseja continuar mesmo com conflitos?`;
+            
+            if (!confirm(mensagem)) {
+              return; // Usuário cancelou
+            }
+          }
+        }
+        // ===== FIM INTEGRAÇÃO IA =====
+
+        // ===== INTEGRAÇÃO IA: Análise de Risco Financeiro =====
+        if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
+          const cliente = this.clientes.find(c => c.id === eventoData.clienteId);
+          if (cliente) {
+            const analise = assistenteFinanceiro.analisarCliente(cliente, this.eventos);
+            if (analise && analise.risco_inadimplencia === "Alto") {
+              const aviso = `⚠️ CLIENTE COM ALTO RISCO:\n\n${analise.descricao}\n\nDeseja continuar?`;
+              if (!confirm(aviso)) {
+                return; // Usuário cancelou
+              }
+            }
+          }
+        }
+        // ===== FIM INTEGRAÇÃO IA =====
+
         if (isEdit) {
           this.updateEvento(eventoData);
         } else {
@@ -644,6 +696,26 @@ class Eventos {
     this.eventos.push(evento);
     Storage.save("eventos", this.eventos);
     this.criarTransacoesFinanceirasEvento(evento);
+    
+    // ===== INTEGRAÇÃO IA: Recomendações de Itens =====
+    if (typeof iaEngine !== 'undefined' && iaEngine.recommendationEngine) {
+      const cliente = this.clientes.find(c => c.id === evento.clienteId);
+      if (cliente) {
+        const historico = this.eventos.filter(e => e.clienteId === evento.clienteId && e.id !== evento.id);
+        const recomendacoes = iaEngine.recommendationEngine.recomendarItens(evento, historico, this.itens);
+        
+        if (recomendacoes.length > 0) {
+          // Armazenar recomendações para exibição
+          evento._recomendacoes_ia = recomendacoes;
+          Storage.save("eventos", this.eventos);
+          
+          // Log para debug
+          console.log('🎯 Recomendações IA:', recomendacoes);
+        }
+      }
+    }
+    // ===== FIM INTEGRAÇÃO IA =====
+    
     this.render();
     UI.showAlert("Evento cadastrado com sucesso!");
   }
@@ -655,6 +727,22 @@ class Eventos {
       Storage.save("eventos", this.eventos);
       // Recriar pendências financeiras: remover anteriores do mesmo evento e recriar
       this.recriarTransacoesFinanceiras(evento);
+      
+      // ===== INTEGRAÇÃO IA: Recomendações de Itens =====
+      if (typeof iaEngine !== 'undefined' && iaEngine.recommendationEngine) {
+        const cliente = this.clientes.find(c => c.id === evento.clienteId);
+        if (cliente) {
+          const historico = this.eventos.filter(e => e.clienteId === evento.clienteId && e.id !== evento.id);
+          const recomendacoes = iaEngine.recommendationEngine.recomendarItens(evento, historico, this.itens);
+          
+          if (recomendacoes.length > 0) {
+            this.eventos[index]._recomendacoes_ia = recomendacoes;
+            Storage.save("eventos", this.eventos);
+          }
+        }
+      }
+      // ===== FIM INTEGRAÇÃO IA =====
+      
       this.render();
       UI.showAlert("Evento atualizado com sucesso!");
     }

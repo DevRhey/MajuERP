@@ -193,6 +193,11 @@ class Calendario {
                         ? this.renderEventsList(events)
                         : "<p>Nenhum evento para esta data.</p>"
                     }
+                    
+                    <!-- ===== INTEGRAÇÃO IA: Análise do Dia ===== -->
+                    ${this.renderAnaliseIADia(events, dateString)}
+                    <!-- ===== FIM INTEGRAÇÃO IA ===== -->
+                    
                     <div class="text-end mt-3">
                         <button class="btn btn-primary" onclick="app.modules.eventos.showForm(null, '${dateString}')">
                             <i class="bi bi-plus-circle"></i> Novo Evento
@@ -365,6 +370,41 @@ class Calendario {
       }`;
     }
   }
+
+  // ===== INTEGRAÇÃO IA: Análise do Dia =====
+  renderAnaliseIADia(events, dateString) {
+    if (!events || events.length === 0) return '';
+    if (typeof iaEngine === 'undefined' || !iaEngine.availabilityAnalyzer) return '';
+
+    try {
+      const analise = iaEngine.availabilityAnalyzer.analisarDisponibilidadesDia(events);
+      
+      if (!analise || !analise.alertas || analise.alertas.length === 0) return '';
+
+      const alertasHtml = analise.alertas.map(alerta => {
+        const iconClass = alerta.severidade === 'alta' ? 'bi-exclamation-triangle text-danger' : 'bi-info-circle text-warning';
+        return `<li class="list-group-item py-2"><i class="bi ${iconClass} me-2"></i>${alerta.descricao}</li>`;
+      }).join('');
+
+      return `
+        <div class="mt-3 alert alert-light border border-warning">
+          <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-bar-chart text-warning fs-6"></i>
+            <div>
+              <h6 class="mb-2">📊 Análise IA do Dia</h6>
+              <ul class="list-group list-group-flush" style="font-size: 0.85rem;">
+                ${alertasHtml}
+              </ul>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      console.warn('Erro ao gerar análise IA:', error);
+      return '';
+    }
+  }
+  // ===== FIM INTEGRAÇÃO IA =====
 }
 
 // Export Calendario class

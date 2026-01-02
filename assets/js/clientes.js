@@ -59,9 +59,17 @@ class Clientes {
   renderTableRows() {
     return this.clientes
       .map(
-        (cliente) => `
+        (cliente) => {
+          const riscoIA = cliente._analise_ia?.risco || 'N/A';
+          const badgeClass = riscoIA === 'Alto' ? 'danger' : riscoIA === 'Médio' ? 'warning' : 'success';
+          const riscoBadge = riscoIA !== 'N/A' ? `<span class="badge bg-${badgeClass}">${riscoIA}</span>` : '';
+          
+          return `
             <tr>
-                <td>${cliente.nome}</td>
+                <td>
+                  <div>${cliente.nome}</div>
+                  ${riscoBadge}
+                </td>
                 <td>${cliente.cpf}</td>
                 <td>${cliente.telefone}</td>
                 <td>
@@ -77,6 +85,7 @@ class Clientes {
                 </td>
             </tr>
         `
+        }
       )
       .join("");
   }
@@ -205,6 +214,28 @@ class Clientes {
   addCliente(cliente) {
     this.clientes.push(cliente);
     Storage.save("clientes", this.clientes);
+    
+    // ===== INTEGRAÇÃO IA: Análise de Risco =====
+    if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
+      // Buscar eventos para análise
+      const eventos = Storage.get("eventos") || [];
+      const analise = assistenteFinanceiro.analisarCliente(cliente, eventos);
+      
+      if (analise) {
+        cliente._analise_ia = {
+          risco: analise.risco_inadimplencia,
+          pontuacao: analise.score,
+          timestamp: new Date().toISOString()
+        };
+        Storage.save("clientes", this.clientes);
+        
+        if (analise.risco_inadimplencia === "Alto") {
+          UI.showAlert(`⚠️ Cliente com risco financeiro ALTO! ${analise.descricao}`, "warning");
+        }
+      }
+    }
+    // ===== FIM INTEGRAÇÃO IA =====
+    
     this.render();
     UI.showAlert("Cliente cadastrado com sucesso!");
   }
@@ -214,6 +245,23 @@ class Clientes {
     if (index !== -1) {
       this.clientes[index] = cliente;
       Storage.save("clientes", this.clientes);
+      
+      // ===== INTEGRAÇÃO IA: Análise de Risco =====
+      if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
+        const eventos = Storage.get("eventos") || [];
+        const analise = assistenteFinanceiro.analisarCliente(cliente, eventos);
+        
+        if (analise) {
+          this.clientes[index]._analise_ia = {
+            risco: analise.risco_inadimplencia,
+            pontuacao: analise.score,
+            timestamp: new Date().toISOString()
+          };
+          Storage.save("clientes", this.clientes);
+        }
+      }
+      // ===== FIM INTEGRAÇÃO IA =====
+      
       this.render();
       UI.showAlert("Cliente atualizado com sucesso!");
     }

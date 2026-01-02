@@ -142,6 +142,10 @@ class Dashboard {
                     </div>
                 </div>
 
+                <!-- ===== INTEGRAÇÃO IA: Alertas e Recomendações ===== -->
+                ${this.renderAlertsIADashboard()}
+                <!-- ===== FIM INTEGRAÇÃO IA ===== -->
+
                 <!-- Disponibilidade de Itens em Tempo Real -->
                 <div class="row mb-4">
                     <div class="col-md-12">
@@ -1696,6 +1700,106 @@ class Dashboard {
       return this.isSameDay(dataEvento, dataSelecionada) && evento.status === status;
     }).length;
   }
+
+  // ===== INTEGRAÇÃO IA: Alertas e Recomendações do Dashboard =====
+  renderAlertsIADashboard() {
+    if (typeof iaEngine === 'undefined') return '';
+
+    try {
+      const alertas = [];
+      const recomendacoes = [];
+
+      // Analisar conflitos no dia selecionado
+      const eventosHoje = this.eventos.filter(e => {
+        const dataEvento = this.parseDataLocal(e.dataInicio);
+        return this.isSameDay(dataEvento, this.selectedDate);
+      });
+
+      if (eventosHoje.length > 0 && iaEngine.conflictDetector) {
+        eventosHoje.forEach(evento => {
+          const eventosOutros = eventosHoje.filter(e => e.id !== evento.id);
+          const conflitos = iaEngine.conflictDetector.verificarConflitos(evento, eventosOutros);
+          if (conflitos.length > 0) {
+            conflitos.forEach(c => alertas.push({
+              tipo: 'conflito',
+              severidade: 'alta',
+              descricao: `[${evento.nome}] ${c.descricao}`
+            }));
+          }
+        });
+      }
+
+      // Analisar clientes com risco financeiro
+      if (iaEngine.riskAnalyzer) {
+        eventosHoje.forEach(evento => {
+          const cliente = this.clientes.find(c => c.id === evento.clienteId);
+          if (cliente && assistenteFinanceiro) {
+            const analise = assistenteFinanceiro.analisarCliente(cliente, this.eventos);
+            if (analise && analise.risco_inadimplencia === "Alto") {
+              alertas.push({
+                tipo: 'risco',
+                severidade: 'alta',
+                descricao: `⚠️ Cliente "${cliente.nome}" em ${evento.nome} tem alto risco de inadimplência`
+              });
+            }
+          }
+        });
+      }
+
+      // Verificar disponibilidade crítica
+      if (iaEngine.availabilityAnalyzer) {
+        const itensComProblema = this.itens.filter(item => {
+          const usados = eventosHoje.reduce((total, e) => {
+            const itemEvento = e.itens.find(i => i.id === item.id);
+            return total + (itemEvento ? itemEvento.quantidade : 0);
+          }, 0);
+          const percentual = (usados / item.quantidadeTotal) * 100;
+          return percentual >= 80; // 80% ou mais em uso
+        });
+
+        if (itensComProblema.length > 0) {
+          const itensTexto = itensComProblema.map(i => i.nome).join(', ');
+          alertas.push({
+            tipo: 'disponibilidade',
+            severidade: 'media',
+            descricao: `📦 Itens com disponibilidade baixa: ${itensTexto}`
+          });
+        }
+      }
+
+      // Se houver alertas, renderizar
+      if (alertas.length === 0) return '';
+
+      const alertasHtml = alertas.map(alerta => {
+        const colorClass = alerta.severidade === 'alta' ? 'warning' : 'info';
+        const icon = alerta.severidade === 'alta' ? 'exclamation-triangle' : 'info-circle';
+        return `
+          <div class="alert alert-${colorClass} mb-2 py-2">
+            <i class="bi bi-${icon} me-2"></i>${alerta.descricao}
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="row mb-4">
+          <div class="col-md-12">
+            <div class="card shadow-sm border-warning">
+              <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-robot me-2"></i>🤖 Alertas e Recomendações IA</h5>
+              </div>
+              <div class="card-body">
+                ${alertasHtml}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      console.error('Erro ao renderizar alertas IA:', error);
+      return '';
+    }
+  }
+  // ===== FIM INTEGRAÇÃO IA =====
 }
 
 // Export Dashboard class

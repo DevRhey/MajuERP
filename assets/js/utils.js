@@ -168,8 +168,18 @@ const UI = {
   },
 };
 
+// Debounce utility para otimizar performance em buscas/filtros
+const debounce = (func, delay = 300) => {
+  let timeoutId;
+  return function (...args) {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func.apply(this, args), delay);
+  };
+};
+
 // Export utilities
 window.Storage = Storage;
 window.Validation = Validation;
 window.DateUtils = DateUtils;
 window.UI = UI;
+window.debounce = debounce;

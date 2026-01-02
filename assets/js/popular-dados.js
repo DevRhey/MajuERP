@@ -1,7 +1,12 @@
 // Script para Popular o Sistema com Dados de Teste
 
-function popularSistema() {
-  if (!confirm("Isso irá adicionar dados de teste ao sistema. Deseja continuar?")) {
+async function popularSistema() {
+  const confirmado = await ConfirmDialog.show(
+    "Popular Sistema",
+    "Isso irá adicionar dados de teste ao sistema. Deseja continuar?"
+  );
+  
+  if (!confirmado) {
     return;
   }
 

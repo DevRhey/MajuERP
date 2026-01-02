@@ -4,6 +4,7 @@ class Itens {
   constructor() {
     this.itens = Storage.get("itens") || [];
     this.selectedDate = new Date();
+    this.searchTerm = '';
     this.setupStorageListener();
   }
 
@@ -45,6 +46,10 @@ class Itens {
                 
                 <div class="card">
                     <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="search-itens" 
+                                   placeholder="🔍 Buscar por nome ou tipo...">
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -69,6 +74,7 @@ class Itens {
             </div>
         `;
     this.setupDatePicker();
+    this.setupSearch();
   }
 
   setupDatePicker() {
@@ -170,6 +176,24 @@ class Itens {
             `;
       })
       .join("");
+  }
+
+  setupSearch() {
+    const searchInput = document.getElementById('search-itens');
+    if (searchInput) {
+      searchInput.value = this.searchTerm;
+      searchInput.addEventListener('input', debounce((e) => {
+        this.searchTerm = e.target.value;
+        this.updateTable();
+      }, 300));
+    }
+  }
+
+  updateTable() {
+    const tbody = document.getElementById('itens-table-body');
+    if (tbody) {
+      tbody.innerHTML = this.renderTableRows();
+    }
   }
 
   showForm(item = null) {
@@ -276,12 +300,12 @@ class Itens {
     );
 
     if (valorDiaria <= 0) {
-      UI.showAlert("O valor da diária deve ser maior que zero", "danger");
+      toast.error("O valor da diária deve ser maior que zero");
       return false;
     }
 
     if (quantidadeTotal <= 0) {
-      UI.showAlert("A quantidade total deve ser maior que zero", "danger");
+      toast.error("A quantidade total deve ser maior que zero");
       return false;
     }
 
@@ -295,7 +319,7 @@ class Itens {
     this.itens.push(item);
     Storage.save("itens", this.itens);
     this.render();
-    UI.showAlert("Item cadastrado com sucesso!");
+    toast.success("Item cadastrado com sucesso!");
   }
 
   updateItem(item) {
@@ -307,22 +331,23 @@ class Itens {
       this.itens[index] = item;
       Storage.save("itens", this.itens);
       this.render();
-      UI.showAlert("Item atualizado com sucesso!");
+      toast.success("Item atualizado com sucesso!");
     }
   }
 
-  deleteItem(id) {
+  async deleteItem(id) {
     console.log("Tentando excluir item com ID:", id);
     console.log("Itens antes da exclusão:", this.itens);
 
-    if (
-      confirm(
-        "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita."
-      )
-    ) {
+    const confirmado = await ConfirmDialog.show(
+      "Excluir Item",
+      "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita."
+    );
+    
+    if (confirmado) {
       const itemToDelete = this.itens.find((i) => i.id === id);
       if (!itemToDelete) {
-        UI.showAlert("Item não encontrado!", "danger");
+        toast.error("Item não encontrado!");
         return;
       }
 
@@ -330,7 +355,7 @@ class Itens {
       Storage.save("itens", this.itens);
       console.log("Itens após a exclusão:", this.itens);
       this.render();
-      UI.showAlert("Item excluído com sucesso!");
+      toast.success("Item excluído com sucesso!");
     }
   }
 

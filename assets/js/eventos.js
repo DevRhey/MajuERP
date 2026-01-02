@@ -5,7 +5,7 @@ class Eventos {
     this.sync();
     this.selectedDate = new Date();
     this.atualizarStatusEventos();
-    this.statusInterval = setInterval(() => this.atualizarStatusEventos(), 10000);
+    this.statusInterval = setInterval(() => this.atualizarStatusEventos(), CONFIG.EVENTOS.STATUS_UPDATE_INTERVAL);
     this.setupStorageListener();
   }
 
@@ -409,7 +409,7 @@ class Eventos {
       form.dataset.eventoId = evento.id;
     }
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (this.validateForm(form)) {
         const formData = new FormData(form);
@@ -438,8 +438,12 @@ class Eventos {
 
         // ===== INTEGRAÇÃO IA: Detector de Conflitos =====
         if (typeof iaEngine !== 'undefined' && iaEngine.conflictDetector) {
+          const loadingToast = toast.loading('Analisando conflitos...');
+          
           const eventosExistentes = this.eventos.filter(e => !isEdit || e.id !== evento.id);
           const conflitos = iaEngine.conflictDetector.verificarConflitos(eventoData, eventosExistentes);
+          
+          toast.resolveLoading(loadingToast, 'success', 'Análise concluída');
           
           if (conflitos.length > 0) {
             const conflitosTexto = conflitos.map((c, i) => `${i + 1}. ${c.descricao}`).join('\n');
@@ -451,7 +455,8 @@ class Eventos {
             }
             mensagem += `Deseja continuar mesmo com conflitos?`;
             
-            if (!confirm(mensagem)) {
+            const confirmado = await ConfirmDialog.show('Conflitos Detectados', mensagem);
+            if (!confirmado) {
               return; // Usuário cancelou
             }
           }
@@ -462,10 +467,14 @@ class Eventos {
         if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
           const cliente = this.clientes.find(c => c.id === eventoData.clienteId);
           if (cliente) {
+            const loadingToast = toast.loading('Analisando risco financeiro...');
             const analise = assistenteFinanceiro.analisarCliente(cliente, this.eventos);
+            toast.resolveLoading(loadingToast, 'success', 'Análise concluída');
+            
             if (analise && analise.risco_inadimplencia === "Alto") {
               const aviso = `⚠️ CLIENTE COM ALTO RISCO:\n\n${analise.descricao}\n\nDeseja continuar?`;
-              if (!confirm(aviso)) {
+              const confirmado = await ConfirmDialog.show('Alerta de Risco', aviso);
+              if (!confirmado) {
                 return; // Usuário cancelou
               }
             }
@@ -548,7 +557,7 @@ class Eventos {
     const horaInicio = document.getElementById("horaInicio");
     const horaFim = document.getElementById("horaFim");
     if (!horaInicio || !horaInicio.value) {
-      UI.showAlert("Selecione o horário de início primeiro", "warning");
+      toast.warning("Selecione o horário de início primeiro");
       return;
     }
     const [h, m] = horaInicio.value.split(":").map(Number);
@@ -584,7 +593,7 @@ class Eventos {
     const eventoIdExcluir = form.dataset.eventoId ? parseInt(form.dataset.eventoId) : null;
 
     if (horaInicio >= horaFim) {
-      UI.showAlert("O horário de início deve ser anterior ao término", "danger");
+      toast.error("O horário de início deve ser anterior ao término");
       return false;
     }
 
@@ -593,12 +602,12 @@ class Eventos {
     hoje.setHours(0, 0, 0, 0);
     dataEvento.setHours(0, 0, 0, 0);
     if (dataEvento < hoje) {
-      UI.showAlert("A data do evento não pode ser no passado", "danger");
+      toast.error("A data do evento não pode ser no passado");
       return false;
     }
 
     if (itens.length === 0) {
-      UI.showAlert("Adicione pelo menos um item ao evento", "danger");
+      toast.error("Adicione pelo menos um item ao evento");
       return false;
     }
 
@@ -645,7 +654,7 @@ class Eventos {
     for (const itemSolicitado of itensSolicitados) {
       const item = this.itens.find((i) => i.id === itemSolicitado.id);
       if (!item) {
-        UI.showAlert("Item não encontrado", "danger");
+        toast.error("Item não encontrado");
         return false;
       }
 
@@ -680,9 +689,8 @@ class Eventos {
 
       const disponiveis = item.quantidadeTotal - totalEmUso;
       if (itemSolicitado.quantidade > disponiveis) {
-        UI.showAlert(
-          `Item ${item.nome} não disponível na quantidade solicitada. Disponíveis: ${disponiveis}`,
-          "danger"
+        toast.error(
+          `Item ${item.nome} não disponível na quantidade solicitada. Disponíveis: ${disponiveis}`
         );
         return false;
       }
@@ -693,6 +701,8 @@ class Eventos {
 
   // ------- CRUD -------
   addEvento(evento) {
+    const loadingToast = toast.loading('Salvando evento...');
+    
     this.eventos.push(evento);
     Storage.save("eventos", this.eventos);
     this.criarTransacoesFinanceirasEvento(evento);
@@ -710,17 +720,19 @@ class Eventos {
           Storage.save("eventos", this.eventos);
           
           // Log para debug
-          console.log('🎯 Recomendações IA:', recomendacoes);
+          debugLog('IA', '🎯 Recomendações IA:', recomendacoes);
         }
       }
     }
     // ===== FIM INTEGRAÇÃO IA =====
     
+    toast.resolveLoading(loadingToast, 'success', 'Evento cadastrado com sucesso!');
     this.render();
-    UI.showAlert("Evento cadastrado com sucesso!");
   }
 
   updateEvento(evento) {
+    const loadingToast = toast.loading('Atualizando evento...');
+    
     const index = this.eventos.findIndex((e) => e.id === evento.id);
     if (index !== -1) {
       this.eventos[index] = evento;
@@ -743,18 +755,24 @@ class Eventos {
       }
       // ===== FIM INTEGRAÇÃO IA =====
       
+      toast.resolveLoading(loadingToast, 'success', 'Evento atualizado com sucesso!');
       this.render();
-      UI.showAlert("Evento atualizado com sucesso!");
     }
   }
 
-  deleteEvento(id) {
-    if (!confirm("Tem certeza que deseja excluir este evento?")) return;
+  async deleteEvento(id) {
+    const confirmado = await ConfirmDialog.show(
+      "Excluir Evento",
+      "Tem certeza que deseja excluir este evento? Esta ação não pode ser desfeita."
+    );
+    
+    if (!confirmado) return;
+    
     this.eventos = this.eventos.filter((e) => e.id !== id);
     Storage.save("eventos", this.eventos);
     this.removerTransacoesDoEvento(id);
     this.render();
-    UI.showAlert("Evento excluído com sucesso!");
+    toast.success("Evento excluído com sucesso!");
   }
 
   editEvento(id) {

@@ -9,11 +9,14 @@ class IAEngine {
     this.recommendationEngine = new RecommendationEngine();
     this.riskAnalyzer = new RiskAnalyzer();
     this.notificationSystem = new NotificationSystem();
+    this.cache = typeof iaCache !== 'undefined' ? iaCache : null;
   }
 
   // Inicializar o sistema de IA
   initialize() {
-    console.log("🤖 IA Engine inicializado com sucesso!");
+    if (CONFIG.DEBUG.IA_ENGINE) {
+      console.log("🤖 IA Engine inicializado com sucesso!");
+    }
     this.notificationSystem.startAlertMonitoring();
   }
 
@@ -39,6 +42,15 @@ class ConflictDetector {
    * @returns {Object} Resultado da verificação
    */
   verificarConflitos(novoEvento, eventosExistentes) {
+    // Verificar cache
+    if (typeof iaCache !== 'undefined') {
+      const cached = iaCache.get('conflitos', { novoEvento, eventosExistentes });
+      if (cached) {
+        debugLog('IA', '✅ Conflitos carregados do cache');
+        return cached;
+      }
+    }
+
     const conflitos = [];
 
     // Convertir datas para comparação
@@ -66,11 +78,18 @@ class ConflictDetector {
       conflitos.push(...conflitosItens);
     }
 
-    return {
+    const resultado = {
       temConflitos: conflitos.length > 0,
       conflitos: conflitos,
       podeAgendar: conflitos.length === 0,
     };
+
+    // Salvar no cache
+    if (typeof iaCache !== 'undefined') {
+      iaCache.set('conflitos', { novoEvento, eventosExistentes }, resultado);
+    }
+
+    return resultado;
   }
 
   /**
@@ -323,6 +342,15 @@ class FinancialPredictor {
    * Análise de risco de inadimplência
    */
   analisarRiscoInadimplencia(clienteId) {
+    // Verificar cache
+    if (typeof iaCache !== 'undefined') {
+      const cached = iaCache.get('risco_inadimplencia', { clienteId });
+      if (cached) {
+        debugLog('IA', '✅ Risco de inadimplência carregado do cache');
+        return cached;
+      }
+    }
+
     const clientes = Storage.get("clientes") || [];
     const eventos = Storage.get("eventos") || [];
     const transacoes = Storage.get("financeiroTransacoes") || [];
@@ -348,19 +376,26 @@ class FinancialPredictor {
 
     const risco = Math.min(100, Math.max(0, score));
 
-    return {
+    const resultado = {
       cliente: cliente.nome,
       score: Math.round(risco),
-      nivel: risco >= 70 ? "Alto" : risco >= 40 ? "Médio" : "Baixo",
+      nivel: risco >= CONFIG.IA.RISCO_INADIMPLENCIA_ALTO ? "Alto" : risco >= CONFIG.IA.RISCO_INADIMPLENCIA_MEDIO ? "Médio" : "Baixo",
       total_eventos: totalEventos,
       total_pago: totalPago,
       total_devido: totalDevido,
       atrasos: atrasados,
       recomendacao:
-        risco >= 70
+        risco >= CONFIG.IA.RISCO_INADIMPLENCIA_ALTO
           ? "Solicitar pagamento antecipado ou entrada maior"
           : "Monitorar",
     };
+
+    // Salvar no cache
+    if (typeof iaCache !== 'undefined') {
+      iaCache.set('risco_inadimplencia', { clienteId }, resultado);
+    }
+
+    return resultado;
   }
 
   /**

@@ -3,6 +3,7 @@
 class Clientes {
   constructor() {
     this.clientes = Storage.get("clientes") || [];
+    this.searchTerm = '';
     this.setupStorageListener();
   }
 
@@ -35,6 +36,10 @@ class Clientes {
                 
                 <div class="card">
                     <div class="card-body">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="search-clientes" 
+                                   placeholder="🔍 Buscar por nome, CPF ou telefone...">
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-hover">
                                 <thead>
@@ -54,10 +59,22 @@ class Clientes {
                 </div>
             </div>
         `;
+    this.setupSearch();
   }
 
   renderTableRows() {
-    return this.clientes
+    let clientesFiltrados = this.clientes;
+    
+    if (this.searchTerm) {
+      const term = this.searchTerm.toLowerCase();
+      clientesFiltrados = this.clientes.filter(cliente => 
+        cliente.nome.toLowerCase().includes(term) ||
+        cliente.cpf.includes(term) ||
+        cliente.telefone.includes(term)
+      );
+    }
+    
+    return clientesFiltrados
       .map(
         (cliente) => {
           const riscoIA = cliente._analise_ia?.risco || 'N/A';
@@ -88,6 +105,24 @@ class Clientes {
         }
       )
       .join("");
+  }
+
+  setupSearch() {
+    const searchInput = document.getElementById('search-clientes');
+    if (searchInput) {
+      searchInput.value = this.searchTerm;
+      searchInput.addEventListener('input', debounce((e) => {
+        this.searchTerm = e.target.value;
+        this.updateTable();
+      }, 300));
+    }
+  }
+
+  updateTable() {
+    const tbody = document.getElementById('clientes-table-body');
+    if (tbody) {
+      tbody.innerHTML = this.renderTableRows();
+    }
   }
 
   showForm(cliente = null) {
@@ -267,12 +302,17 @@ class Clientes {
     }
   }
 
-  deleteCliente(id) {
-    if (confirm("Tem certeza que deseja excluir este cliente?")) {
+  async deleteCliente(id) {
+    const confirmado = await ConfirmDialog.show(
+      "Excluir Cliente",
+      "Tem certeza que deseja excluir este cliente?"
+    );
+    
+    if (confirmado) {
       this.clientes = this.clientes.filter((c) => c.id !== id);
       Storage.save("clientes", this.clientes);
       this.render();
-      UI.showAlert("Cliente excluído com sucesso!");
+      toast.success("Cliente excluído com sucesso!");
     }
   }
 

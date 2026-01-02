@@ -1162,10 +1162,15 @@ class Dashboard {
     });
   }
 
-  confirmarRetirada(eventoId) {
+  async confirmarRetirada(eventoId) {
     console.log('Confirmar Retirada chamado para evento ID:', eventoId);
     
-    if (!confirm('Confirmar que os equipamentos deste evento foram retirados?')) {
+    const confirmado = await ConfirmDialog.show(
+      'Confirmar Retirada',
+      'Confirmar que os equipamentos deste evento foram retirados?'
+    );
+    
+    if (!confirmado) {
       return;
     }
 

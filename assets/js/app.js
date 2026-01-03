@@ -12,6 +12,8 @@ class App {
       orcamentos: null,
       financeiro: null,
     };
+    // Expor cedo para handlers que rodam durante construção
+    window.app = this;
     this.initializeApp();
   }
 
@@ -45,15 +47,12 @@ class App {
     }
     this.currentPage = page;
 
-    // Limpar intervalos do dashboard anterior
-    if (this.modules.dashboard && this.modules.dashboard.relogioInterval) {
-      clearInterval(this.modules.dashboard.relogioInterval);
+    // Limpar intervalos e listeners de módulos anteriores
+    if (this.modules.dashboard && this.modules.dashboard.destroy) {
+      this.modules.dashboard.destroy();
     }
-    if (this.modules.dashboard && this.modules.dashboard.autoRefreshInterval) {
-      clearInterval(this.modules.dashboard.autoRefreshInterval);
-    }
-    if (this.modules.dashboard && this.modules.dashboard.removerStorageListener) {
-      this.modules.dashboard.removerStorageListener();
+    if (this.modules.eventos && this.modules.eventos.destroy) {
+      this.modules.eventos.destroy();
     }
 
     // Update active nav link

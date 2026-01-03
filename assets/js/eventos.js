@@ -5,8 +5,35 @@ class Eventos {
     this.sync();
     this.selectedDate = new Date();
     this.atualizarStatusEventos();
-    this.statusInterval = setInterval(() => this.atualizarStatusEventos(), CONFIG.EVENTOS.STATUS_UPDATE_INTERVAL);
+    this.renderCache = null;
+    this.lastRenderTime = 0;
+    // ✨ Remove setInterval - usar background-sync invisível em vez disso
+    this.setupBackgroundSync();
     this.setupStorageListener();
+  }
+  
+  destroy() {
+    // Limpar background sync listener
+    if (this.unsubscribeBgSync) {
+      this.unsubscribeBgSync();
+    }
+  }
+
+  /**
+   * Setup background sync para atualizar dados invisível em background
+   * Sem reload de página, sem percepção do usuário
+   */
+  setupBackgroundSync() {
+    if (!backgroundSync) return;
+    
+    // Quando eventos forem atualizados em background, chamar renderIncremental
+    this.unsubscribeBgSync = backgroundSync.onUpdate('eventos', (newData) => {
+      this.eventos = newData || [];
+      // Atualizar status sem renderizar página inteira
+      if (window.app && app.currentPage === 'eventos') {
+        this.renderIncremental();
+      }
+    });
   }
 
   setupStorageListener() {
@@ -14,7 +41,7 @@ class Eventos {
       const { key } = e.detail;
       if (key === "eventos" || key === "clientes" || key === "itens" || key === "financeiroTransacoes") {
         this.sync();
-        if (app.currentPage === "eventos") {
+        if (window.app && app.currentPage === "eventos") {
           this.render();
         }
       }
@@ -55,6 +82,41 @@ class Eventos {
     this.setupDatePicker();
   }
 
+  /**
+   * Renderização incremental - atualiza apenas elementos que mudaram
+   * Sem fazer reload de página inteira, completamente invisível
+   */
+  renderIncremental() {
+    // Só atualizar status dos eventos visíveis
+    const container = document.getElementById('eventos-container');
+    if (!container) return;
+
+    const eventos = this.eventos.filter(evento => {
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
+      return this.isSameDay(dataEvento, this.selectedDate);
+    });
+
+    // Atualizar apenas os badges de status
+    eventos.forEach(evento => {
+      const statusEl = document.querySelector(`[data-evento-id="${evento.id}"] .badge`);
+      if (statusEl) {
+        const statusClass = this.getStatusClass(evento.status);
+        const statusText = this.getStatusText(evento.status);
+        statusEl.className = `badge ${statusClass}`;
+        statusEl.textContent = statusText;
+      }
+
+      // Atualizar info de pagamento se existir
+      const pagtoEl = document.querySelector(`[data-evento-id="${evento.id}"] [data-pagamento]`);
+      if (pagtoEl) {
+        const pagamentoInfo = this.getPagamentoInfo(evento);
+        pagtoEl.innerHTML = pagamentoInfo;
+      }
+    });
+
+    this.atualizarStatusEventos();
+  }
+
   setupDatePicker() {
     const dateInput = document.getElementById("eventos-date");
     if (dateInput) {
@@ -69,6 +131,9 @@ class Eventos {
   }
 
   parseDataLocal(isoDateStr) {
+    if (!isoDateStr) return new Date();
+    if (isoDateStr instanceof Date) return isoDateStr;
+    if (typeof isoDateStr !== 'string') return new Date();
     const [ano, mes, dia] = isoDateStr.split("-").map(Number);
     return new Date(ano, mes - 1, dia);
   }
@@ -96,7 +161,7 @@ class Eventos {
       const statusClass = this.getStatusClass(evento.status);
       const statusText = this.getStatusText(evento.status);
       const pagamentoInfo = this.getPagamentoInfo(evento);
-      const dataEvento = this.converterDataLocal(evento.dataInicio);
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
 
       return `
         <div class="col-md-6 col-lg-4 mb-4">
@@ -221,7 +286,7 @@ class Eventos {
         const cliente = this.clientes.find((c) => c.id === evento.clienteId);
         const statusClass = this.getStatusClass(evento.status);
         const statusText = this.getStatusText(evento.status);
-        const dataEvento = this.converterDataLocal(evento.dataInicio);
+        const dataEvento = this.parseDataLocal(evento.dataInicio);
         const pagamentoInfo = this.getPagamentoInfo(evento);
 
         return `
@@ -409,9 +474,14 @@ class Eventos {
       form.dataset.eventoId = evento.id;
     }
 
+    let isSubmitting = false;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      
+      if (isSubmitting) return;
       if (this.validateForm(form)) {
+        isSubmitting = true;
         const formData = new FormData(form);
         const itensSelecionados = this.getItensFromForm();
         const valorItens = this.calcularValorTotal(itensSelecionados);
@@ -437,26 +507,34 @@ class Eventos {
         };
 
         // ===== INTEGRAÇÃO IA: Detector de Conflitos =====
-        if (typeof iaEngine !== 'undefined' && iaEngine.conflictDetector) {
+        {
           const loadingToast = toast.loading('Analisando conflitos...');
-          
           const eventosExistentes = this.eventos.filter(e => !isEdit || e.id !== evento.id);
-          const conflitos = iaEngine.conflictDetector.verificarConflitos(eventoData, eventosExistentes);
-          
-          toast.resolveLoading(loadingToast, 'success', 'Análise concluída');
-          
-          if (conflitos.length > 0) {
-            const conflitosTexto = conflitos.map((c, i) => `${i + 1}. ${c.descricao}`).join('\n');
-            const sugestoes = iaEngine.conflictDetector.sugerirDatasAlternativas(eventoData, eventosExistentes);
+
+          let resultado = null;
+          if (typeof iaOrchestrator !== 'undefined' && iaOrchestrator.analisarEventoCalendario) {
+            resultado = await iaOrchestrator.analisarEventoCalendario(eventoData, eventosExistentes);
+          } else if (typeof iaEngine !== 'undefined' && iaEngine.conflictDetector) {
+            resultado = iaEngine.conflictDetector.verificarConflitos(eventoData, eventosExistentes);
+          }
+
+          toast.resolveLoading(loadingToast, 'Análise concluída', 'success');
+
+          if (resultado?.temConflitos && resultado.conflitos?.length > 0) {
+            const conflitosTexto = resultado.conflitos.map((c, i) => `${i + 1}. ${c.mensagem || c.descricao || 'Conflito detectado'}`).join('\n');
+            const sugestoes = resultado.sugestoes || (iaEngine?.conflictDetector?.sugerirDatasAlternativas
+              ? iaEngine.conflictDetector.sugerirDatasAlternativas(eventoData, eventosExistentes)
+              : []);
             let mensagem = `⚠️ CONFLITOS DETECTADOS:\n\n${conflitosTexto}\n\n`;
-            
+
             if (sugestoes.length > 0) {
               mensagem += `💡 DATAS ALTERNATIVAS:\n${sugestoes.map((s, i) => `${i + 1}. ${s}`).join('\n')}\n\n`;
             }
             mensagem += `Deseja continuar mesmo com conflitos?`;
-            
+
             const confirmado = await ConfirmDialog.show('Conflitos Detectados', mensagem);
             if (!confirmado) {
+              isSubmitting = false;
               return; // Usuário cancelou
             }
           }
@@ -464,19 +542,33 @@ class Eventos {
         // ===== FIM INTEGRAÇÃO IA =====
 
         // ===== INTEGRAÇÃO IA: Análise de Risco Financeiro =====
-        if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
+        {
           const cliente = this.clientes.find(c => c.id === eventoData.clienteId);
           if (cliente) {
-            const loadingToast = toast.loading('Analisando risco financeiro...');
-            const analise = assistenteFinanceiro.analisarCliente(cliente, this.eventos);
-            toast.resolveLoading(loadingToast, 'success', 'Análise concluída');
-            
-            if (analise && analise.risco_inadimplencia === "Alto") {
-              const aviso = `⚠️ CLIENTE COM ALTO RISCO:\n\n${analise.descricao}\n\nDeseja continuar?`;
-              const confirmado = await ConfirmDialog.show('Alerta de Risco', aviso);
-              if (!confirmado) {
-                return; // Usuário cancelou
+            try {
+              const loadingToast = toast.loading('Analisando risco financeiro...');
+              const transacoes = Storage.get('financeiroTransacoes') || [];
+              let analise = null;
+
+              if (typeof iaOrchestrator !== 'undefined' && iaOrchestrator.analisarClienteFinanceiro) {
+                analise = await iaOrchestrator.analisarClienteFinanceiro(cliente, this.eventos, transacoes, this.clientes);
+              } else if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro?.analisarCliente) {
+                analise = assistenteFinanceiro.analisarCliente(cliente.id);
               }
+
+              toast.resolveLoading(loadingToast, 'Análise concluída', 'success');
+            
+              if (analise && analise.risco_inadimplencia === "Alto") {
+                const aviso = `⚠️ CLIENTE COM ALTO RISCO:\n\n${analise.descricao || 'Risco elevado de inadimplência'}\n\nDeseja continuar?`;
+                const confirmado = await ConfirmDialog.show('Alerta de Risco', aviso);
+                if (!confirmado) {
+                  isSubmitting = false;
+                  return; // Usuário cancelou
+                }
+              }
+            } catch (error) {
+              console.error('Erro na análise IA:', error);
+              toast.warning('Não foi possível analisar risco do cliente');
             }
           }
         }
@@ -597,7 +689,7 @@ class Eventos {
       return false;
     }
 
-    const dataEvento = this.converterDataLocal(dataInicio);
+    const dataEvento = this.parseDataLocal(dataInicio);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     dataEvento.setHours(0, 0, 0, 0);
@@ -637,7 +729,7 @@ class Eventos {
 
   // ------- Lógica de disponibilidade -------
   verificarDisponibilidadeItens(dataInicio, horaInicio, horaFim, itensSolicitados, eventoIdExcluir = null) {
-    const dataEvento = this.converterDataLocal(dataInicio);
+    const dataEvento = this.parseDataLocal(dataInicio);
     const [horaInicioEvento, minutoInicioEvento] = horaInicio.split(":").map(Number);
     const [horaFimEvento, minutoFimEvento] = horaFim.split(":").map(Number);
 
@@ -663,7 +755,7 @@ class Eventos {
       this.eventos.forEach((evento) => {
         if (eventoIdExcluir && evento.id === eventoIdExcluir) return;
 
-        const dataEvt = this.converterDataLocal(evento.dataInicio);
+        const dataEvt = this.parseDataLocal(evento.dataInicio);
         const [hIni, mIni] = evento.horaInicio.split(":").map(Number);
         const [hFim, mFim] = evento.horaFim.split(":").map(Number);
 
@@ -788,7 +880,7 @@ class Eventos {
     let houveMudanca = false;
 
     this.eventos.forEach((evento) => {
-      const dataEvento = this.converterDataLocal(evento.dataInicio);
+      const dataEvento = this.parseDataLocal(evento.dataInicio);
       const [horaInicio, minutoInicio] = evento.horaInicio.split(":").map(Number);
       const [horaFim, minutoFim] = evento.horaFim.split(":").map(Number);
 
@@ -816,7 +908,7 @@ class Eventos {
 
     if (houveMudanca) {
       Storage.save("eventos", this.eventos);
-      if (app.currentPage === "eventos") {
+      if (window.app && app.currentPage === "eventos") {
         this.render();
       }
     }
@@ -1062,11 +1154,6 @@ class Eventos {
   }
 
   // ------- Utilitários -------
-  converterDataLocal(dataStr) {
-    const [ano, mes, dia] = dataStr.split("-").map(Number);
-    return new Date(ano, mes - 1, dia);
-  }
-
   calcularValorTotal(itens) {
     return itens.reduce((total, item) => {
       const itemObj = this.itens.find((i) => i.id === item.id);

@@ -40,10 +40,10 @@
                         <a class="nav-link" href="#" data-page="calendario">Calendário</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="orcamentos" onclick="app.loadPage('orcamentos')">Orçamentos</a>
+                        <a class="nav-link" href="#" data-page="orcamentos">Orçamentos</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#" data-page="financeiro" onclick="app.loadPage('financeiro')">Financeiro</a>
+                        <a class="nav-link" href="#" data-page="financeiro">Financeiro</a>
                     </li>
                     <li class="nav-item">
                         <button class="btn btn-success btn-sm ms-2" onclick="popularSistema()">
@@ -71,14 +71,45 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- IndexedDB Database Layer -->
+    <script src="assets/js/db.js"></script>
     <!-- System Configuration & Utilities -->
     <script src="assets/js/config.js"></script>
     <script src="assets/js/utils.js"></script>
     <script src="assets/js/notifications.js"></script>
+    <!-- Background sync + Web Workers manager (precisam carregar antes dos módulos que os usam) -->
+    <script src="assets/js/background-sync.js"></script>
+    <script src="assets/js/workers-manager.js"></script>
+    <!-- IA Orchestrator centraliza todas as chamadas de IA -->
+    <script src="assets/js/ia-orchestrator.js"></script>
+    <!-- Assistente Orquestrador (monitora sistema e gera sugestões) -->
+    <script src="assets/js/assistente-orquestrador.js"></script>
+    
+    <!-- Inicializar IndexedDB antes de tudo -->
+    <script>
+      (async () => {
+        try {
+          console.log('🚀 Inicializando IndexedDB...');
+          await simpleDB.init();
+          // Sincronizar dados existentes do localStorage para IndexedDB
+          const hasLocalData = localStorage.getItem('eventos');
+          if (hasLocalData && !await simpleDB.count('eventos')) {
+            console.log('📥 Primeira execução - importando dados do localStorage...');
+            await simpleDB.syncFromLocalStorage();
+          }
+          console.log('✅ Sistema pronto!');
+        } catch (error) {
+          console.error('❌ Erro ao inicializar IndexedDB:', error);
+          console.warn('⚠️ Sistema funcionará com localStorage apenas');
+        }
+      })();
+    </script>
+    
     <script src="assets/js/ia-cache.js"></script>
     <script src="assets/js/popular-dados.js"></script>
-    <!-- IA Engine & Modules -->
+    <!-- IA Engine (carrega ANTES dos módulos IA) -->
     <script src="assets/js/ia-engine.js"></script>
+    <!-- IA Modules (dependem do ia-engine.js) -->
     <script src="assets/js/ia-modules/calendario-assistente.js"></script>
     <script src="assets/js/ia-modules/financeiro-assistente.js"></script>
     <!-- Application Modules -->
@@ -90,6 +121,9 @@
     <script src="assets/js/orcamentos.js"></script>
     <script src="assets/js/financeiro.js"></script>
     <script src="assets/js/app.js"></script>
+    
+    <!-- Database Admin Panel (Desenvolvimento) -->
+    <script src="assets/js/db-admin.js"></script>
 </body>
 
 </html>

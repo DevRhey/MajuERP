@@ -14,7 +14,7 @@ class IAEngine {
 
   // Inicializar o sistema de IA
   initialize() {
-    if (CONFIG.DEBUG.IA_ENGINE) {
+    if (CONFIG.DEBUG.LOG_IA) {
       console.log("🤖 IA Engine inicializado com sucesso!");
     }
     this.notificationSystem.startAlertMonitoring();
@@ -68,9 +68,9 @@ class ConflictDetector {
     });
 
     // Verificar conflitos de itens
-    if (novoEvento.itensAlugados && novoEvento.itensAlugados.length > 0) {
+    if (novoEvento.itens && novoEvento.itens.length > 0) {
       const conflitosItens = this.verificarConflitosItens(
-        novoEvento.itensAlugados,
+        novoEvento.itens,
         dataInicio,
         dataFim,
         eventosExistentes
@@ -122,8 +122,8 @@ class ConflictDetector {
 
       eventosExistentes.forEach((evento) => {
         if (this.verificarSobreposicao(dataInicio, dataFim, evento)) {
-          const itemNoEvento = evento.itensAlugados.find(
-            (i) => i.itemId === itemAlugado.itemId
+          const itemNoEvento = evento.itens.find(
+            (i) => i.itemId === itemAlugado.itemId || i.id === itemAlugado.id
           );
           if (itemNoEvento) {
             quantidadeAlocada += itemNoEvento.quantidade;
@@ -150,7 +150,9 @@ class ConflictDetector {
    * Converte string de data para objeto Date (horário local)
    */
   parseDataLocal(isoDateStr) {
+    if (!isoDateStr) return new Date();
     if (isoDateStr instanceof Date) return isoDateStr;
+    if (typeof isoDateStr !== 'string') return new Date();
     const [ano, mes, dia] = isoDateStr.split("-").map(Number);
     return new Date(ano, mes - 1, dia);
   }
@@ -247,8 +249,8 @@ class AvailabilityAnalyzer {
 
     eventos.forEach((evento) => {
       if (this.verificarSobreposicao(dataInicio, dataFim, evento)) {
-        const itemNoEvento = evento.itensAlugados.find(
-          (i) => i.itemId === item.id
+        const itemNoEvento = evento.itens.find(
+          (i) => i.itemId === item.id || i.id === item.id
         );
         if (itemNoEvento) {
           alugados += itemNoEvento.quantidade;
@@ -298,7 +300,9 @@ class AvailabilityAnalyzer {
    * Parse de data
    */
   parseDataLocal(isoDateStr) {
+    if (!isoDateStr) return new Date();
     if (isoDateStr instanceof Date) return isoDateStr;
+    if (typeof isoDateStr !== 'string') return new Date();
     const [ano, mes, dia] = isoDateStr.split("-").map(Number);
     return new Date(ano, mes - 1, dia);
   }
@@ -416,7 +420,9 @@ class FinancialPredictor {
    * Parse de data
    */
   parseDataLocal(isoDateStr) {
+    if (!isoDateStr) return new Date();
     if (isoDateStr instanceof Date) return isoDateStr;
+    if (typeof isoDateStr !== 'string') return new Date();
     const [ano, mes, dia] = isoDateStr.split("-").map(Number);
     return new Date(ano, mes - 1, dia);
   }
@@ -484,7 +490,7 @@ class RecommendationEngine {
    */
   calcularFrequencia(itemId, eventos) {
     return eventos.filter((e) =>
-      e.itensAlugados.some((i) => i.itemId === itemId)
+      e.itens.some((i) => i.itemId === itemId || i.id === itemId)
     ).length;
   }
 
@@ -647,7 +653,9 @@ class NotificationSystem {
    * Parse de data
    */
   parseDataLocal(isoDateStr) {
+    if (!isoDateStr) return new Date();
     if (isoDateStr instanceof Date) return isoDateStr;
+    if (typeof isoDateStr !== 'string') return new Date();
     const [ano, mes, dia] = isoDateStr.split("-").map(Number);
     return new Date(ano, mes - 1, dia);
   }
@@ -660,3 +668,7 @@ document.addEventListener("DOMContentLoaded", () => {
   iaEngine = new IAEngine();
   iaEngine.initialize();
 });
+
+// Exportar para uso global
+window.IAEngine = IAEngine;
+window.iaEngine = iaEngine;

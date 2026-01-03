@@ -9,6 +9,10 @@ class Dashboard {
     this.relogioInterval = null;
     this.autoRefreshInterval = null;
     this.storageHandler = null;
+    this.dispFiltroJanela = 'all';
+    this.dispFiltroStatus = { full: true, partial: true, none: true };
+    this.dispHoraInicio = '08:00';
+    this.dispHoraFim = '22:00';
     this.setupStorageListener();
   }
 
@@ -28,6 +32,36 @@ class Dashboard {
     this.clientes = Storage.get("clientes") || [];
     this.itens = Storage.get("itens") || [];
     this.eventos = Storage.get("eventos") || [];
+  }
+
+  setDisponibilidadeJanela(valor) {
+    this.dispFiltroJanela = valor || 'all';
+    this.render();
+  }
+
+  setDisponibilidadeStatus(tipo, checked) {
+    if (tipo === 'all') {
+      this.dispFiltroStatus = { full: !!checked, partial: !!checked, none: !!checked };
+    } else {
+      this.dispFiltroStatus = {
+        ...this.dispFiltroStatus,
+        [tipo]: !!checked
+      };
+    }
+
+    // Se todos desmarcados, mantém todos off (mostra vazio conforme escolha do usuário)
+
+    this.render();
+  }
+
+  setDisponibilidadeHoraInicio(valor) {
+    this.dispHoraInicio = valor || '08:00';
+    this.render();
+  }
+
+  setDisponibilidadeHoraFim(valor) {
+    this.dispHoraFim = valor || '22:00';
+    this.render();
   }
 
   render() {
@@ -766,7 +800,9 @@ class Dashboard {
     return this.itens
       .filter((item) => {
         const quantidadeAlugada = itensAlugados[item.id] || 0;
-        return item.quantidadeTotal > quantidadeAlugada;
+        if (item.quantidadeTotal <= quantidadeAlugada) return false;
+
+        return true;
       })
       .map((item) => ({
         ...item,
@@ -809,7 +845,9 @@ class Dashboard {
     return this.itens
       .filter((item) => {
         const quantidadeAlugada = itensAlugados[item.id] || 0;
-        return quantidadeAlugada > 0;
+        if (quantidadeAlugada <= 0) return false;
+
+        return true;
       })
       .map((item) => ({
         ...item,
@@ -1324,19 +1362,24 @@ class Dashboard {
     const horarios = [];
     const agora = new Date();
     const isHoje = this.isSameDay(agora, this.selectedDate);
-    
-    // Gerar horários de 8h às 22h (intervalos de 2 horas)
-    for (let hora = 8; hora <= 22; hora += 2) {
+    const [startHourRaw] = (this.dispHoraInicio || '08:00').split(':').map(Number);
+    const [endHourRaw] = (this.dispHoraFim || '22:00').split(':').map(Number);
+    let startHour = Number.isFinite(startHourRaw) ? startHourRaw : 8;
+    let endHour = Number.isFinite(endHourRaw) ? endHourRaw : 22;
+    if (endHour <= startHour) endHour = Math.min(startHour + 2, 23);
+
+    // Gerar horários customizados (intervalos de 2 horas)
+    for (let hora = startHour; hora <= endHour; hora += 2) {
       const horaStr = `${String(hora).padStart(2, '0')}:00`;
       const horaFimStr = `${String(Math.min(hora + 2, 23)).padStart(2, '0')}:00`;
-      
+
       const horaPassed = isHoje && hora < agora.getHours();
-      
+
       // Não incluir horários que já passaram se for hoje
       if (horaPassed) {
         continue;
       }
-      
+
       horarios.push({
         inicio: horaStr,
         fim: horaFimStr,
@@ -1344,9 +1387,64 @@ class Dashboard {
       });
     }
 
+    // Aplicar filtros (críticos e status)
+    const itensFiltrados = this.itens.filter(item => {
+      const matchStatus = horarios.some(h => {
+        const info = this.getDisponibilidadeItemNoHorario(item.id, h.inicio, h.fim);
+        const tipoDisp = info.disponivel === 0
+          ? 'none'
+          : (info.disponivel < item.quantidadeTotal ? 'partial' : 'full');
+        return this.dispFiltroStatus[tipoDisp];
+      });
+
+      if (!matchStatus) return false;
+
+      return true;
+    });
+
     // HTML da tabela com coluna fixa
     let html = `
       <div class="table-responsive" style="overflow-x: auto;">
+        <div class="d-flex flex-wrap gap-3 align-items-center mb-3">
+          <div class="input-group" style="max-width: 220px;">
+            <label class="input-group-text" for="disp-inicio"><i class="bi bi-clock-history"></i> Início</label>
+            <input type="time" class="form-control" id="disp-inicio" value="${this.dispHoraInicio}"
+                   onchange="app.modules.dashboard.setDisponibilidadeHoraInicio(this.value)">
+          </div>
+          <div class="input-group" style="max-width: 220px;">
+            <label class="input-group-text" for="disp-fim"><i class="bi bi-clock-history"></i> Fim</label>
+            <input type="time" class="form-control" id="disp-fim" value="${this.dispHoraFim}"
+                   onchange="app.modules.dashboard.setDisponibilidadeHoraFim(this.value)">
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <span class="text-muted small">Status:</span>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="disp-all"
+                     ${this.dispFiltroStatus.full && this.dispFiltroStatus.partial && this.dispFiltroStatus.none ? 'checked' : ''}
+                     onchange="app.modules.dashboard.setDisponibilidadeStatus('all', this.checked)">
+              <label class="form-check-label" for="disp-all">Todos</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="disp-full"
+                     ${this.dispFiltroStatus.full ? 'checked' : ''}
+                     onchange="app.modules.dashboard.setDisponibilidadeStatus('full', this.checked)">
+              <label class="form-check-label" for="disp-full">Totalmente Disponível</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="disp-partial"
+                     ${this.dispFiltroStatus.partial ? 'checked' : ''}
+                     onchange="app.modules.dashboard.setDisponibilidadeStatus('partial', this.checked)">
+              <label class="form-check-label" for="disp-partial">Parcialmente Disponível</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="disp-none"
+                     ${this.dispFiltroStatus.none ? 'checked' : ''}
+                     onchange="app.modules.dashboard.setDisponibilidadeStatus('none', this.checked)">
+              <label class="form-check-label" for="disp-none">Indisponível</label>
+            </div>
+          </div>
+          ${itensFiltrados.length === 0 ? '<span class="text-muted">Nenhum item para exibir com os filtros atuais.</span>' : ''}
+        </div>
         <table class="table table-bordered table-hover mb-0" style="position: relative;">
           <thead class="table-dark sticky-top">
             <tr>
@@ -1356,8 +1454,8 @@ class Dashboard {
               <th class="text-center align-middle" style="position: sticky; left: 120px; z-index: 10; background-color: #212529; width: 60px;">Total</th>
               ${horarios.map(h => `
                 <th class="text-center align-middle ${h.passou ? 'bg-secondary bg-opacity-25' : ''}" style="min-width: 100px;">
-                  <div class="small">${h.inicio}</div>
-                  <div class="small text-muted">às ${h.fim}</div>
+                  <div class="small text-light fw-bold">${h.inicio}</div>
+                  <div class="small" style="color: #e9eef4; opacity: 0.95;">às ${h.fim}</div>
                   ${h.passou ? '<small class="badge bg-secondary">Passou</small>' : ''}
                 </th>
               `).join('')}
@@ -1367,7 +1465,7 @@ class Dashboard {
     `;
 
     // Para cada item, mostrar disponibilidade em cada horário
-    this.itens.forEach(item => {
+    itensFiltrados.forEach(item => {
       html += `
         <tr>
           <td style="position: sticky; left: 0; z-index: 5; background-color: white; max-width: 120px; overflow: hidden; text-overflow: ellipsis;">
@@ -1391,17 +1489,20 @@ class Dashboard {
         let badgeClass = 'bg-success';
         let icon = 'bi-check-circle-fill';
         let textColor = 'text-success';
+        let tipoDisp = 'full';
         
         if (dispInfo.disponivel === 0) {
           cellClass = 'table-danger';
           badgeClass = 'bg-danger';
           icon = 'bi-x-circle-fill';
           textColor = 'text-danger';
+          tipoDisp = 'none';
         } else if (dispInfo.disponivel < item.quantidadeTotal) {
           cellClass = 'table-warning';
           badgeClass = 'bg-warning text-dark';
           icon = 'bi-exclamation-circle-fill';
           textColor = 'text-warning';
+          tipoDisp = 'partial';
         } else {
           cellClass = 'table-success';
         }
@@ -1411,7 +1512,7 @@ class Dashboard {
         }
 
         html += `
-          <td class="text-center align-middle ${cellClass}" style="position: relative;">
+          <td class="text-center align-middle ${cellClass}" style="position: relative; ${this.dispFiltroStatus[tipoDisp] ? '' : 'display:none;'}">
             <div class="d-flex flex-column align-items-center gap-1">
               <i class="bi ${icon} ${textColor}"></i>
               <span class="badge ${badgeClass}">${dispInfo.disponivel}/${item.quantidadeTotal}</span>
@@ -1580,9 +1681,25 @@ class Dashboard {
     const horarios = [];
     const agora = new Date();
     const isHoje = this.isSameDay(agora, this.selectedDate);
+    let startHour = 8;
+    let endHour = 22;
+
+    switch (this.dispFiltroJanela) {
+      case 'morning':
+        startHour = 8; endHour = 12;
+        break;
+      case 'afternoon':
+        startHour = 12; endHour = 18;
+        break;
+      case 'night':
+        startHour = 18; endHour = 22;
+        break;
+      default:
+        startHour = 8; endHour = 22;
+    }
     
     // Gerar horários de 8h às 22h (intervalos de 2 horas)
-    for (let hora = 8; hora <= 22; hora += 2) {
+    for (let hora = startHour; hora <= endHour; hora += 2) {
       const horaStr = `${String(hora).padStart(2, '0')}:00`;
       const horaFimStr = `${String(Math.min(hora + 2, 23)).padStart(2, '0')}:00`;
       

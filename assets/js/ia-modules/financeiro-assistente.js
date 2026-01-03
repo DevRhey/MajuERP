@@ -206,9 +206,9 @@ class AssistenteFinanceiro {
 
     // Analisar combinações de itens mais frequentes
     eventos.forEach((evento) => {
-      if (evento.itensAlugados && evento.itensAlugados.length > 1) {
-        const chave = evento.itensAlugados
-          .map((i) => i.itemId)
+      if (evento.itens && evento.itens.length > 1) {
+        const chave = evento.itens
+          .map((i) => i.itemId || i.id)
           .sort()
           .join(",");
 
@@ -476,3 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("✅ Assistente Financeiro Inteligente carregado!");
   }
 });
+
+// Exportar para uso global
+window.AssistenteFinanceiro = AssistenteFinanceiro;
+window.assistenteFinanceiro = assistenteFinanceiro;

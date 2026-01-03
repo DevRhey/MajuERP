@@ -3,19 +3,134 @@
 class Calendario {
   constructor() {
     this.eventos = Storage.get("eventos") || [];
+    this.clientes = Storage.get("clientes") || [];
+    this.itens = Storage.get("itens") || [];
     this.currentDate = new Date();
     this.currentMonth = this.currentDate.getMonth();
     this.currentYear = this.currentDate.getFullYear();
+    // Cache em memória para análises da IA por data
+    this.analiseCache = new Map();
+    // IA centralizada
+    this.iaOrchestrator = typeof iaOrchestrator !== 'undefined' ? iaOrchestrator : null;
+    
+    // ✨ Web Worker para análises em background
+    this.iaWorker = null;
+    this.pendingAnalyses = new Map();
+    this.initializeWorker();
+    
     this.setupStorageListener();
+    this.setupBackgroundSync();
+  }
+
+  /**
+   * Inicializa Web Worker para rodar IA em background thread
+   * Não bloqueia main thread enquanto calcula
+   */
+  initializeWorker() {
+    try {
+      this.iaWorker = new Worker('assets/js/ia-modules/calendario-assistente.worker.js');
+      this.iaWorker.onmessage = (event) => {
+        const { id, type, resultado, erro } = event.data;
+
+        if (erro) {
+          console.error(`Erro em Worker (${id}):`, erro);
+          return;
+        }
+
+        // Resolver promise pendente
+        if (this.pendingAnalyses.has(id)) {
+          const { resolve, reject } = this.pendingAnalyses.get(id);
+          this.pendingAnalyses.delete(id);
+          
+          if (type === 'erro') {
+            reject(new Error(erro));
+          } else {
+            resolve(resultado);
+            // Cache resultado
+            this.analiseCache.set(id, resultado);
+          }
+        }
+      };
+      console.log('🔄 Web Worker (Calendario) inicializado');
+    } catch (err) {
+      console.error('Erro ao inicializar Worker:', err);
+      this.iaWorker = null;
+    }
+  }
+
+  /**
+   * Envia análise para Web Worker (executa em background)
+   */
+  async analisarEventoNoWorker(evento, eventos) {
+    // Preferir orquestrador central
+    if (this.iaOrchestrator && this.iaOrchestrator.analisarEventoCalendario) {
+      return this.iaOrchestrator.analisarEventoCalendario(evento, eventos);
+    }
+
+    if (!this.iaWorker) {
+      // Fallback: executar na main thread (não ideal)
+      return this.analisarEventoLocal(evento, eventos);
+    }
+
+    const id = `analise_${Date.now()}_${Math.random()}`;
+    return new Promise((resolve, reject) => {
+      this.pendingAnalyses.set(id, { resolve, reject });
+      this.iaWorker.postMessage({
+        id,
+        type: 'analisarEvento',
+        payload: { evento, eventos }
+      });
+      setTimeout(() => {
+        if (this.pendingAnalyses.has(id)) {
+          this.pendingAnalyses.delete(id);
+          reject(new Error('Worker timeout'));
+        }
+      }, 5000);
+    });
+  }
+
+  /**
+   * Análise local como fallback
+   */
+  analisarEventoLocal(evento, eventos) {
+    if (typeof CalendarioAssistente === 'undefined') {
+      return { conflitos: {}, disponibilidade: {}, sugestoes: [] };
+    }
+    const assistente = new CalendarioAssistente();
+    return assistente.validarAgendamento(evento);
+  }
+
+  /**
+   * Setup background sync para atualizar dados invisível
+   */
+  setupBackgroundSync() {
+    if (typeof backgroundSync === 'undefined' || !backgroundSync) return;
+
+    backgroundSync.onUpdate('eventos', (newData) => {
+      this.eventos = newData || [];
+      // Limpar análise cache para forçar re-análise
+      this.analiseCache.clear();
+      // Renderizar incrementalmente (sem reload de página)
+      this.renderIncremental();
+    });
   }
 
   setupStorageListener() {
     window.addEventListener('storageUpdate', (e) => {
       const { key } = e.detail;
-      if (key === 'eventos') {
+      // Sincronizar quando dados relacionados mudam
+      if (key === 'eventos' || key === 'clientes' || key === 'itens') {
         this.sync();
-        if (app.currentPage === 'calendario') {
-          this.render();
+        // Limpar cache de análise quando eventos mudam
+        if (key === 'eventos') {
+          this.analiseCache.clear();
+          if (typeof iaCache !== 'undefined' && iaCache) {
+            iaCache.clearByType('conflitos');
+            iaCache.clearByType('risco');
+          }
+        }
+        if (app && app.currentPage === 'calendario') {
+          this.renderIncremental();
         }
       }
     });
@@ -23,6 +138,26 @@ class Calendario {
 
   sync() {
     this.eventos = Storage.get("eventos") || [];
+    this.clientes = Storage.get("clientes") || [];
+    this.itens = Storage.get("itens") || [];
+  }
+
+  /**
+   * Renderização incremental - atualiza apenas badges/status visíveis
+   * Completamente invisível ao usuário
+   */
+  renderIncremental() {
+    const eventDays = document.querySelectorAll('[data-event-date]');
+    eventDays.forEach(dayEl => {
+      const dateStr = dayEl.dataset.eventDate;
+      const dayEvents = this.eventos.filter(e => e.dataInicio === dateStr);
+      
+      // Atualizar badge de contagem
+      const badgeEl = dayEl.querySelector('.event-count-badge');
+      if (badgeEl) {
+        badgeEl.textContent = dayEvents.length;
+      }
+    });
   }
 
   // Função utilitária para converter string de data para objeto Date no horário local
@@ -32,6 +167,9 @@ class Calendario {
   }
 
   render() {
+    // Sincronizar dados antes de renderizar
+    this.sync();
+    
     const mainContent = document.getElementById("main-content");
     mainContent.innerHTML = `
             <div class="container">
@@ -147,6 +285,7 @@ class Calendario {
   }
 
   hasEventsOnDate(date) {
+    if (!this.eventos || this.eventos.length === 0) return false;
     return this.eventos.some((evento) => {
       const eventoDate = this.parseDataLocal(evento.dataInicio);
       return (
@@ -158,6 +297,7 @@ class Calendario {
   }
 
   getEventsOnDate(date) {
+    if (!this.eventos || this.eventos.length === 0) return [];
     return this.eventos.filter((evento) => {
       const eventoDate = this.parseDataLocal(evento.dataInicio);
       return (
@@ -169,6 +309,15 @@ class Calendario {
   }
 
   showDayEvents(dateString) {
+    // Sincronizar dados antes de mostrar eventos
+    this.sync();
+    
+    // Re-sincronizar uma segunda vez com pequeno delay para garantir dados frescos
+    // (caso haja operações pendentes no localStorage)
+    setTimeout(() => {
+      this.sync();
+    }, 0);
+    
     // Garantir formato local YYYY-MM-DD
     const [y, m, d] = dateString.split("-").map(Number);
     const date = new Date(y, m - 1, d);
@@ -178,7 +327,11 @@ class Calendario {
       return;
     }
     
+    // Sincronizar novamente antes de buscar eventos (garantir dados mais recentes)
+    this.sync();
     const events = this.getEventsOnDate(date);
+    
+    console.log(`[Calendário] Mostrando eventos para ${dateString}:`, events.length, 'eventos encontrados');
 
     const eventsHtml = `
             <div class="card">
@@ -194,9 +347,8 @@ class Calendario {
                         : "<p>Nenhum evento para esta data.</p>"
                     }
                     
-                    <!-- ===== INTEGRAÇÃO IA: Análise do Dia ===== -->
-                    ${this.renderAnaliseIADia(events, dateString)}
-                    <!-- ===== FIM INTEGRAÇÃO IA ===== -->
+                    <!-- Análise IA será carregada aqui após a modal abrir -->
+                    <div id="analise-ia-container"></div>
                     
                     <div class="text-end mt-3">
                         <button class="btn btn-primary" onclick="app.modules.eventos.showForm(null, '${dateString}')">
@@ -208,6 +360,75 @@ class Calendario {
         `;
 
     UI.showModal(`Eventos - ${DateUtils.formatDate(date)}`, eventsHtml, true);
+    
+    // ✨ Carregar análise IA de forma invisível usando Web Worker
+    this.carregarAnaliseIAAsync(events, dateString);
+    
+    // Garantir sincronização após fechar a modal
+    const modalElement = document.getElementById("dynamicModal");
+    if (modalElement) {
+      modalElement.addEventListener('hidden.bs.modal', () => {
+        this.sync();
+        // Renderização incremental em vez de reload total
+        this.renderIncremental();
+      });
+    }
+  }
+
+  /**
+   * Carrega análise IA em background usando Web Worker
+   * Não bloqueia UI, usuário não percebe carregamento
+   */
+  async carregarAnaliseIAAsync(events, dateString) {
+    // Usar requestIdleCallback para não bloquear UI crítica
+    const callback = async () => {
+      if (!events || events.length === 0) return;
+      
+      try {
+        // Enviar para Web Worker (executa em background)
+        const analises = [];
+        
+        for (const event of events) {
+          try {
+            // Check cache first
+            const cacheKey = `analise_${event.id}`;
+            let analise = this.analiseCache.get(cacheKey);
+            
+            if (!analise) {
+              // Executar no Worker (não bloqueia main thread)
+              analise = await this.analisarEventoNoWorker(event, events);
+              this.analiseCache.set(cacheKey, analise);
+            }
+            analises.push(analise);
+          } catch (err) {
+            console.warn(`Erro ao analisar evento ${event.id}:`, err);
+          }
+        }
+
+        // Renderizar resultado incrementalmente
+        const analiseHtml = this.renderAnaliseIADia(events, dateString, analises);
+        const container = document.getElementById('analise-ia-container');
+        
+        if (container && analiseHtml) {
+          // Fade-in suave
+          container.style.opacity = '0';
+          container.innerHTML = analiseHtml;
+          // Smooth fade-in
+          setTimeout(() => {
+            container.style.transition = 'opacity 0.3s ease';
+            container.style.opacity = '1';
+          }, 10);
+        }
+      } catch (error) {
+        console.warn('Erro ao carregar análise IA:', error);
+      }
+    };
+
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(callback, { timeout: 2000 });
+    } else {
+      setTimeout(callback, 200);
+    }
   }
 
   renderEventsList(events) {
@@ -278,10 +499,9 @@ class Calendario {
   }
 
   renderItensDetalhados(itens) {
-    const itensCadastrados = Storage.get("itens") || [];
     return itens
       .map((item) => {
-        const itemObj = itensCadastrados.find((i) => i.id === item.id);
+        const itemObj = this.itens.find((i) => i.id === item.id);
         if (!itemObj) return "";
 
         return `
@@ -298,8 +518,7 @@ class Calendario {
   }
 
   getClienteNome(clienteId) {
-    const clientes = Storage.get("clientes") || [];
-    const cliente = clientes.find((c) => c.id === clienteId);
+    const cliente = this.clientes.find((c) => c.id === clienteId);
     return cliente ? cliente.nome : "Cliente não encontrado";
   }
 
@@ -372,11 +591,53 @@ class Calendario {
   }
 
   // ===== INTEGRAÇÃO IA: Análise do Dia =====
-  renderAnaliseIADia(events, dateString) {
+  renderAnaliseIADia(events, dateString, analises = []) {
     if (!events || events.length === 0) return '';
-    if (typeof iaEngine === 'undefined' || !iaEngine.availabilityAnalyzer) return '';
 
     try {
+      // Se temos análises do Worker, usar elas
+      if (analises && analises.length > 0) {
+        // Combinar sugestões de todas as análises
+        let todassSugestoes = [];
+        let todosConflitos = [];
+        
+        analises.forEach(analise => {
+          if (analise.sugestoes) todassSugestoes = todassSugestoes.concat(analise.sugestoes);
+          if (analise.conflitos && analise.conflitos.conflitos) {
+            todosConflitos = todosConflitos.concat(analise.conflitos.conflitos);
+          }
+        });
+
+        if (todassSugestoes.length === 0 && todosConflitos.length === 0) return '';
+
+        const sugestoesHtml = todassSugestoes
+          .slice(0, 3)
+          .map(sugestao => `<li class="list-group-item py-2"><i class="bi bi-lightbulb me-2 text-warning"></i>${sugestao.titulo || sugestao}</li>`)
+          .join('');
+
+        const conflitosHtml = todosConflitos
+          .slice(0, 2)
+          .map(conflito => `<li class="list-group-item py-2"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>${conflito.titulo || conflito}</li>`)
+          .join('');
+
+        return `
+          <div class="mt-3 alert alert-light border border-warning">
+            <div class="d-flex align-items-start gap-2">
+              <i class="bi bi-bar-chart text-warning fs-6"></i>
+              <div style="flex-grow: 1;">
+                <h6 class="mb-2">📊 Análise IA do Dia</h6>
+                <ul class="list-group list-group-flush" style="font-size: 0.85rem;">
+                  ${conflitosHtml}${sugestoesHtml}
+                </ul>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // Fallback para análise local (se Worker não disponível)
+      if (typeof iaEngine === 'undefined' || !iaEngine.availabilityAnalyzer) return '';
+
       const analise = iaEngine.availabilityAnalyzer.analisarDisponibilidadesDia(events);
       
       if (!analise || !analise.alertas || analise.alertas.length === 0) return '';
@@ -386,7 +647,7 @@ class Calendario {
         return `<li class="list-group-item py-2"><i class="bi ${iconClass} me-2"></i>${alerta.descricao}</li>`;
       }).join('');
 
-      return `
+      const resultado = `
         <div class="mt-3 alert alert-light border border-warning">
           <div class="d-flex align-items-start gap-2">
             <i class="bi bi-bar-chart text-warning fs-6"></i>
@@ -399,6 +660,11 @@ class Calendario {
           </div>
         </div>
       `;
+      
+      // Armazenar no cache
+      this.analiseCache.set(dateString, resultado);
+      
+      return resultado;
     } catch (error) {
       console.warn('Erro ao gerar análise IA:', error);
       return '';

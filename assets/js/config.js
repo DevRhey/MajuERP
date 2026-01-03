@@ -130,6 +130,21 @@ const CONFIG = {
     LOG_CACHE: false,
     LOG_PERFORMANCE: false,
   },
+
+  // ===== ASSISTENTE / ORQUESTRADOR =====
+  ASSISTENTE: {
+    CHECK_INTERVAL: 60 * 1000, // 1 minuto
+    HORAS_LIMIAR_MONTAGEM: 24,
+    HORAS_LIMIAR_RETIRADA: 2,
+    HORAS_LIMIAR_COBRANCA: 24,
+    LIMIAR_OCUPACAO_ALERTA: 0.8,
+    LIMITE_REPETICAO_ITEM: 3,
+    WHATSAPP: {
+      ENABLED: false,
+      WEBHOOK_URL: null, // informe aqui seu endpoint do provedor
+      TOKEN: null,
+    },
+  },
 };
 
 /**

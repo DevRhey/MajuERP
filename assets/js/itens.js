@@ -13,7 +13,7 @@ class Itens {
       const { key } = e.detail;
       if (key === 'itens' || key === 'eventos') {
         this.sync();
-        if (app.currentPage === 'itens') {
+        if (window.app && app.currentPage === 'itens') {
           this.render();
         }
       }
@@ -373,19 +373,26 @@ class Itens {
     // Calcular quantidade alugada baseada nos eventos ativos
     const eventos = Storage.get("eventos") || [];
     const agora = new Date();
-    const BUFFER_LOGISTICA_MS = 40 * 60 * 1000; // 40 minutos
+    const BUFFER_MONTAGEM_MS = 40 * 60 * 1000; // 40 minutos antes
+    const BUFFER_DESMONTAGEM_MS = 40 * 60 * 1000; // 40 minutos depois
     let quantidadeAlugada = 0;
     
     eventos.forEach((evento) => {
-      if (evento.status === "finalizado") return;
+      if (evento.status === "finalizado" || evento.status === "cancelado") return;
       
-      // Verificar se ainda está ocupado (incluindo buffer)
+      // Verificar se ainda está ocupado (incluindo buffer de montagem e desmontagem)
       const [ano, mes, dia] = evento.dataInicio.split('-').map(Number);
+      const [horaInicio, minInicio] = evento.horaInicio.split(':').map(Number);
       const [horaFim, minFim] = evento.horaFim.split(':').map(Number);
-      const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
-      const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
       
-      if (agora < fimComBuffer || evento.status === 'aguardando' || evento.status === 'andamento') {
+      const inicioEvento = new Date(ano, mes - 1, dia, horaInicio, minInicio, 0);
+      const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
+      
+      // Item ocupado se: agora está entre (inicio - buffer) e (fim + buffer)
+      const inicioComBuffer = new Date(inicioEvento.getTime() - BUFFER_MONTAGEM_MS);
+      const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_DESMONTAGEM_MS);
+      
+      if (agora >= inicioComBuffer && agora <= fimComBuffer) {
         evento.itens.forEach((itemEvento) => {
           if (itemEvento.id === itemId) {
             quantidadeAlugada += itemEvento.quantidade;
@@ -427,7 +434,7 @@ class Itens {
       return "Disponível agora";
     }
 
-    // Ordenar eventos por data e hora de fim
+    // Ordenar eventos por data e hora de fim (mais cedo primeiro)
     eventosAtivos.sort((a, b) => {
       const [anoA, mesA, diaA] = a.dataInicio.split('-').map(Number);
       const [horaFimA, minFimA] = a.horaFim.split(':').map(Number);
@@ -437,13 +444,13 @@ class Itens {
       const [horaFimB, minFimB] = b.horaFim.split(':').map(Number);
       const fimB = new Date(anoB, mesB - 1, diaB, horaFimB, minFimB, 0);
       
-      return fimB - fimA; // Ordenar do mais tardio para o mais cedo
+      return fimA - fimB; // ordenar do mais cedo para o mais tarde
     });
 
-    // Pegar o evento que termina por último
-    const ultimoEvento = eventosAtivos[0];
-    const [ano, mes, dia] = ultimoEvento.dataInicio.split('-').map(Number);
-    const [horaFim, minFim] = ultimoEvento.horaFim.split(':').map(Number);
+    // Pegar o evento que termina primeiro (menor bloqueio)
+    const primeiroQueLibera = eventosAtivos[0];
+    const [ano, mes, dia] = primeiroQueLibera.dataInicio.split('-').map(Number);
+    const [horaFim, minFim] = primeiroQueLibera.horaFim.split(':').map(Number);
     const fimEvento = new Date(ano, mes - 1, dia, horaFim, minFim, 0);
     const fimComBuffer = new Date(fimEvento.getTime() + BUFFER_LOGISTICA_MS);
 

@@ -99,7 +99,7 @@ class CalendarioAssistente {
     }
 
     // Aviso: sem itens selecionados
-    if (!evento.itensAlugados || evento.itensAlugados.length === 0) {
+    if (!evento.itens || evento.itens.length === 0) {
       avisos.push({
         tipo: "sem_itens",
         nivel: "info",
@@ -358,3 +358,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("✅ Assistente de Calendário Inteligente carregado!");
   }
 });
+
+// Exportar para uso global
+window.CalendarioAssistente = CalendarioAssistente;
+window.calendarioAssistente = calendarioAssistente;

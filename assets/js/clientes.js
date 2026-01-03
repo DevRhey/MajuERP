@@ -12,7 +12,7 @@ class Clientes {
       const { key } = e.detail;
       if (key === 'clientes') {
         this.sync();
-        if (app.currentPage === 'clientes') {
+        if (window.app && app.currentPage === 'clientes') {
           this.render();
         }
       }
@@ -167,7 +167,7 @@ class Clientes {
 
     // Form validation and submission
     const form = document.getElementById("cliente-form");
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (this.validateForm(form)) {
         const formData = new FormData(form);
@@ -180,9 +180,9 @@ class Clientes {
         };
 
         if (isEdit) {
-          this.updateCliente(clienteData);
+          await this.updateCliente(clienteData);
         } else {
-          this.addCliente(clienteData);
+          await this.addCliente(clienteData);
         }
 
         bootstrap.Modal.getInstance(
@@ -246,59 +246,54 @@ class Clientes {
     });
   }
 
-  addCliente(cliente) {
+  async addCliente(cliente) {
     this.clientes.push(cliente);
     Storage.save("clientes", this.clientes);
-    
-    // ===== INTEGRAÇÃO IA: Análise de Risco =====
-    if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
-      // Buscar eventos para análise
-      const eventos = Storage.get("eventos") || [];
-      const analise = assistenteFinanceiro.analisarCliente(cliente, eventos);
-      
-      if (analise) {
-        cliente._analise_ia = {
-          risco: analise.risco_inadimplencia,
-          pontuacao: analise.score,
-          timestamp: new Date().toISOString()
-        };
-        Storage.save("clientes", this.clientes);
-        
-        if (analise.risco_inadimplencia === "Alto") {
-          UI.showAlert(`⚠️ Cliente com risco financeiro ALTO! ${analise.descricao}`, "warning");
-        }
-      }
-    }
-    // ===== FIM INTEGRAÇÃO IA =====
-    
+    await this.analisarClienteIA(cliente);
     this.render();
     UI.showAlert("Cliente cadastrado com sucesso!");
   }
 
-  updateCliente(cliente) {
+  async updateCliente(cliente) {
     const index = this.clientes.findIndex((c) => c.id === cliente.id);
     if (index !== -1) {
       this.clientes[index] = cliente;
       Storage.save("clientes", this.clientes);
-      
-      // ===== INTEGRAÇÃO IA: Análise de Risco =====
-      if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro.analisarCliente) {
-        const eventos = Storage.get("eventos") || [];
-        const analise = assistenteFinanceiro.analisarCliente(cliente, eventos);
-        
-        if (analise) {
-          this.clientes[index]._analise_ia = {
+      await this.analisarClienteIA(cliente, index);
+      this.render();
+      UI.showAlert("Cliente atualizado com sucesso!");
+    }
+  }
+
+  async analisarClienteIA(cliente, existingIndex = null) {
+    try {
+      const eventos = Storage.get("eventos") || [];
+      const transacoes = Storage.get("financeiroTransacoes") || [];
+      let analise = null;
+
+      if (typeof iaOrchestrator !== 'undefined' && iaOrchestrator.analisarClienteFinanceiro) {
+        analise = await iaOrchestrator.analisarClienteFinanceiro(cliente, eventos, transacoes, this.clientes);
+      } else if (typeof assistenteFinanceiro !== 'undefined' && assistenteFinanceiro?.analisarCliente) {
+        analise = assistenteFinanceiro.analisarCliente(cliente.id);
+      }
+
+      if (analise) {
+        const targetIndex = existingIndex !== null ? existingIndex : this.clientes.findIndex((c) => c.id === cliente.id);
+        if (targetIndex !== -1) {
+          this.clientes[targetIndex]._analise_ia = {
             risco: analise.risco_inadimplencia,
             pontuacao: analise.score,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           };
           Storage.save("clientes", this.clientes);
         }
+
+        if (analise.risco_inadimplencia === "Alto") {
+          UI.showAlert(`⚠️ Cliente com risco financeiro ALTO! ${analise.descricao || ''}`.trim(), "warning");
+        }
       }
-      // ===== FIM INTEGRAÇÃO IA =====
-      
-      this.render();
-      UI.showAlert("Cliente atualizado com sucesso!");
+    } catch (error) {
+      console.error('Erro ao analisar cliente via IA', error);
     }
   }
 

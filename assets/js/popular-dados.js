@@ -199,182 +199,158 @@ async function popularSistema() {
   Storage.save("itens", itens);
   console.log("✅ Itens populados:", itens.length);
 
-  // 3. POPULAR EVENTOS
-  const hoje = new Date(2025, 11, 25); // 25 de dezembro de 2025
+  // 3. POPULAR EVENTOS (dinâmicos em torno da data atual)
+  const base = new Date();
+  base.setHours(0, 0, 0, 0);
+  const toDateStr = (d) => {
+    const ano = d.getFullYear();
+    const mes = `${d.getMonth() + 1}`.padStart(2, '0');
+    const dia = `${d.getDate()}`.padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  };
+  const addDays = (n) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + n);
+    return d;
+  };
+
   const eventos = [];
 
-  // Eventos finalizados (passados)
+  // Passado recente: finalizado ontem
   eventos.push({
-    id: 1735100000000,
+    id: Date.now() - 10_000,
     clienteId: clientes[0].id,
-    dataInicio: "2025-12-20",
-    horaInicio: "14:00",
-    horaFim: "18:00",
+    dataInicio: toDateStr(addDays(-1)),
+    horaInicio: "08:00",
+    horaFim: "12:00",
     itens: [
-      { id: itens[0].id, quantidade: 1 }, // Pula-Pula
-      { id: itens[2].id, quantidade: 1 }, // Cama Elástica
-      { id: itens[6].id, quantidade: 2 }  // Recreação
+      { id: itens[0].id, quantidade: 1 },
+      { id: itens[6].id, quantidade: 1 }
     ],
-    observacoes: "Festa de aniversário de 6 anos - Tema Princesas",
+    observacoes: "Festa escolar encerrada ontem",
     status: "finalizado",
-    valorTotal: 770.00
+    valorTotal: 520.00
   });
 
+  // Em andamento agora (largura longa para testar buffers)
   eventos.push({
-    id: 1735100001000,
-    clienteId: clientes[1].id,
-    dataInicio: "2025-12-22",
-    horaInicio: "10:00",
-    horaFim: "14:00",
-    itens: [
-      { id: itens[1].id, quantidade: 1 }, // Tobogã
-      { id: itens[3].id, quantidade: 2 }, // Piscina de Bolinhas
-      { id: itens[8].id, quantidade: 1 }  // Máquina de Algodão Doce
-    ],
-    observacoes: "Evento corporativo - Dia das Crianças dos funcionários",
-    status: "finalizado",
-    valorTotal: 530.00
-  });
-
-  // Eventos em andamento (hoje)
-  eventos.push({
-    id: 1735150000000,
+    id: Date.now() - 9_000,
     clienteId: clientes[2].id,
-    dataInicio: "2025-12-25",
-    horaInicio: "09:00",
-    horaFim: "13:00",
-    itens: [
-      { id: itens[0].id, quantidade: 1 }, // Pula-Pula
-      { id: itens[4].id, quantidade: 2 }, // Mesa de Pebolim
-      { id: itens[6].id, quantidade: 1 }, // Recreação
-      { id: itens[10].id, quantidade: 1 } // Pintura Facial
-    ],
-    observacoes: "Festa de Natal da família - 30 crianças",
-    status: "andamento",
-    valorTotal: 660.00
-  });
-
-  eventos.push({
-    id: 1735150001000,
-    clienteId: clientes[3].id,
-    dataInicio: "2025-12-25",
-    horaInicio: "15:00",
+    dataInicio: toDateStr(base),
+    horaInicio: "07:00",
     horaFim: "19:00",
     itens: [
-      { id: itens[1].id, quantidade: 1 }, // Tobogã
-      { id: itens[2].id, quantidade: 2 }, // Cama Elástica
-      { id: itens[7].id, quantidade: 1 }, // Decoração Frozen
-      { id: itens[9].id, quantidade: 1 }  // Pipoca
+      { id: itens[1].id, quantidade: 1 },
+      { id: itens[3].id, quantidade: 1 },
+      { id: itens[6].id, quantidade: 2 },
+      { id: itens[9].id, quantidade: 1 }
     ],
-    observacoes: "Aniversário de 8 anos - Tema Frozen",
-    status: "aguardando",
-    valorTotal: 1020.00
+    observacoes: "Evento de dia inteiro - teste de ocupação",
+    status: "andamento",
+    valorTotal: 1450.00
   });
 
-  // Eventos aguardando (futuros)
+  // Sobreposição no dia (para conflito/ocupação)
   eventos.push({
-    id: 1735236000000,
+    id: Date.now() - 8_000,
+    clienteId: clientes[3].id,
+    dataInicio: toDateStr(base),
+    horaInicio: "12:30",
+    horaFim: "16:30",
+    itens: [
+      { id: itens[1].id, quantidade: 1 },
+      { id: itens[2].id, quantidade: 2 },
+      { id: itens[7].id, quantidade: 1 }
+    ],
+    observacoes: "Aniversário com possível conflito de itens",
+    status: "aguardando",
+    valorTotal: 980.00
+  });
+
+  // Aguardando hoje à noite
+  eventos.push({
+    id: Date.now() - 7_000,
     clienteId: clientes[4].id,
-    dataInicio: "2025-12-26",
-    horaInicio: "10:00",
-    horaFim: "14:00",
+    dataInicio: toDateStr(base),
+    horaInicio: "19:00",
+    horaFim: "23:00",
     itens: [
-      { id: itens[0].id, quantidade: 2 }, // Pula-Pula
-      { id: itens[3].id, quantidade: 1 }, // Piscina de Bolinhas
-      { id: itens[5].id, quantidade: 3 }, // Carrinho Elétrico
-      { id: itens[11].id, quantidade: 1 } // Show de Mágica
+      { id: itens[0].id, quantidade: 1 },
+      { id: itens[5].id, quantidade: 2 },
+      { id: itens[11].id, quantidade: 1 }
     ],
-    observacoes: "Festa de confraternização da escola",
+    observacoes: "Evento noturno aguardando confirmação",
     status: "aguardando",
-    valorTotal: 1170.00
+    valorTotal: 1240.00
   });
 
+  // Amanhã cedo (aguardando)
   eventos.push({
-    id: 1735322400000,
+    id: Date.now() - 6_000,
     clienteId: clientes[5].id,
-    dataInicio: "2025-12-27",
-    horaInicio: "14:00",
-    horaFim: "18:00",
+    dataInicio: toDateStr(addDays(1)),
+    horaInicio: "08:30",
+    horaFim: "12:30",
     itens: [
-      { id: itens[2].id, quantidade: 1 }, // Cama Elástica
-      { id: itens[4].id, quantidade: 1 }, // Mesa de Pebolim
-      { id: itens[6].id, quantidade: 2 }, // Recreação
-      { id: itens[8].id, quantidade: 1 }  // Algodão Doce
+      { id: itens[2].id, quantidade: 1 },
+      { id: itens[4].id, quantidade: 1 },
+      { id: itens[10].id, quantidade: 1 }
     ],
-    observacoes: "Aniversário de 10 anos - Tema Esportes",
+    observacoes: "Manhã seguinte - teste de agenda",
     status: "aguardando",
-    valorTotal: 830.00
+    valorTotal: 690.00
   });
 
+  // Depois de amanhã (aguardando) com muitos itens para stress de estoque
   eventos.push({
-    id: 1735408800000,
+    id: Date.now() - 5_000,
     clienteId: clientes[6].id,
-    dataInicio: "2025-12-28",
-    horaInicio: "16:00",
-    horaFim: "20:00",
-    itens: [
-      { id: itens[0].id, quantidade: 1 }, // Pula-Pula
-      { id: itens[1].id, quantidade: 1 }, // Tobogã
-      { id: itens[7].id, quantidade: 1 }, // Decoração
-      { id: itens[9].id, quantidade: 1 }, // Pipoca
-      { id: itens[10].id, quantidade: 1 } // Pintura Facial
-    ],
-    observacoes: "Festa de aniversário de 7 anos - Tema Super-Heróis",
-    status: "aguardando",
-    valorTotal: 1130.00
-  });
-
-  eventos.push({
-    id: 1735495200000,
-    clienteId: clientes[7].id,
-    dataInicio: "2025-12-29",
+    dataInicio: toDateStr(addDays(2)),
     horaInicio: "10:00",
     horaFim: "15:00",
     itens: [
-      { id: itens[2].id, quantidade: 2 }, // Cama Elástica
-      { id: itens[3].id, quantidade: 2 }, // Piscina de Bolinhas
-      { id: itens[5].id, quantidade: 2 }, // Carrinho Elétrico
-      { id: itens[6].id, quantidade: 3 }  // Recreação
+      { id: itens[0].id, quantidade: 2 },
+      { id: itens[1].id, quantidade: 1 },
+      { id: itens[3].id, quantidade: 2 },
+      { id: itens[5].id, quantidade: 2 },
+      { id: itens[6].id, quantidade: 3 }
     ],
-    observacoes: "Evento corporativo de fim de ano - 50 crianças",
+    observacoes: "Grande evento escolar - carga alta",
     status: "aguardando",
-    valorTotal: 1330.00
+    valorTotal: 1980.00
   });
 
-  // Mais eventos para janeiro de 2026
+  // Cancelado para testar exclusões
   eventos.push({
-    id: 1735668000000,
-    clienteId: clientes[0].id,
-    dataInicio: "2025-12-31",
-    horaInicio: "18:00",
-    horaFim: "22:00",
+    id: Date.now() - 4_000,
+    clienteId: clientes[7].id,
+    dataInicio: toDateStr(addDays(3)),
+    horaInicio: "09:00",
+    horaFim: "11:00",
     itens: [
-      { id: itens[0].id, quantidade: 1 }, // Pula-Pula
-      { id: itens[4].id, quantidade: 2 }, // Mesa de Pebolim
-      { id: itens[8].id, quantidade: 2 }, // Algodão Doce
-      { id: itens[9].id, quantidade: 2 }, // Pipoca
-      { id: itens[11].id, quantidade: 1 } // Show de Mágica
+      { id: itens[8].id, quantidade: 1 },
+      { id: itens[9].id, quantidade: 1 }
     ],
-    observacoes: "Festa de Réveillon para crianças",
-    status: "aguardando",
-    valorTotal: 1270.00
+    observacoes: "Evento cancelado - manter para histórico",
+    status: "cancelado",
+    valorTotal: 310.00
   });
 
+  // Finalizado há 3 dias para relatório
   eventos.push({
-    id: 1736100000000,
+    id: Date.now() - 3_000,
     clienteId: clientes[1].id,
-    dataInicio: "2026-01-05",
-    horaInicio: "14:00",
-    horaFim: "18:00",
+    dataInicio: toDateStr(addDays(-3)),
+    horaInicio: "13:00",
+    horaFim: "17:00",
     itens: [
-      { id: itens[1].id, quantidade: 1 }, // Tobogã
-      { id: itens[2].id, quantidade: 1 }, // Cama Elástica
-      { id: itens[6].id, quantidade: 1 }, // Recreação
-      { id: itens[10].id, quantidade: 1 } // Pintura Facial
+      { id: itens[2].id, quantidade: 1 },
+      { id: itens[8].id, quantidade: 1 },
+      { id: itens[10].id, quantidade: 1 }
     ],
-    observacoes: "Aniversário de 5 anos - Tema Patrulha Canina",
-    status: "aguardando",
-    valorTotal: 770.00
+    observacoes: "Passado recente para dashboards",
+    status: "finalizado",
+    valorTotal: 840.00
   });
 
   Storage.save("eventos", eventos);

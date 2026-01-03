@@ -6,6 +6,7 @@ class App {
     this.modules = {
       clientes: null,
       itens: null,
+      operadores: null,
       eventos: null,
       calendario: null,
       dashboard: null,
@@ -80,6 +81,9 @@ class App {
         case "itens":
           this.loadItens();
           break;
+        case "operadores":
+          this.loadOperadores();
+          break;
         case "eventos":
           this.loadEventos();
           break;
@@ -122,6 +126,17 @@ class App {
       this.modules.itens = new Itens();
     }
     this.modules.itens.render();
+  }
+
+  loadOperadores() {
+    if (typeof OperadoresModule === "undefined") {
+      UI.showAlert("Módulo Monitores não carregou.", "danger");
+      return;
+    }
+    if (!this.modules.operadores) {
+      this.modules.operadores = new OperadoresModule();
+    }
+    this.modules.operadores.render();
   }
 
   loadEventos() {
@@ -176,6 +191,9 @@ class App {
     if (!Storage.get("eventos")) {
       Storage.save("eventos", []);
     }
+    if (!Storage.get("operadores")) {
+      Storage.save("operadores", []);
+    }
     if (!Storage.get("orcamentos")) {
       Storage.save("orcamentos", []);
     }
@@ -195,6 +213,7 @@ class App {
     this.modules.dashboard = new Dashboard();
     this.modules.clientes = new Clientes();
     this.modules.itens = new Itens();
+    this.modules.operadores = new OperadoresModule();
     this.modules.eventos = new Eventos();
     this.modules.calendario = new Calendario();
     this.modules.orcamentos = new Orcamentos();

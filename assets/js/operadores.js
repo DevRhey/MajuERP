@@ -410,6 +410,9 @@ class OperadoresService {
   salvarLocalmente() {
     try {
       localStorage.setItem('operadores', JSON.stringify(this.operadores));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('storageUpdate', { detail: { key: 'operadores' } }));
+      }
     } catch (error) {
       console.error('Erro ao salvar em localStorage:', error);
     }
@@ -443,3 +446,213 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // Expor globalmente
 window.operadoresService = operadoresService;
+
+// ---------------- UI Module ----------------
+class OperadoresModule {
+  constructor() {
+    this.service = window.operadoresService || operadoresService;
+    this.eventos = Storage.get('eventos') || [];
+  }
+
+  async render() {
+    await this.service.inicializar();
+    this.eventos = Storage.get('eventos') || [];
+    const operadores = this.service.listar();
+    const main = document.getElementById('main-content');
+    if (!main) return;
+
+    main.innerHTML = `
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-people me-2"></i>Monitores / Operadores</h2>
+        <button class="btn btn-primary" onclick="app.modules.operadores.showForm()">
+          <i class="bi bi-person-plus"></i> Novo Monitor
+        </button>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          ${operadores.length === 0 ? `
+            <div class="alert alert-info mb-0">
+              Nenhum monitor cadastrado. Clique em "Novo Monitor" para adicionar.
+            </div>
+          ` : `
+            <div class="table-responsive">
+              <table class="table align-middle">
+                <thead>
+                  <tr>
+                    <th>Nome</th>
+                    <th>Diária (R$)</th>
+                    <th>Contrato</th>
+                    <th>Disponibilidade</th>
+                    <th class="text-end">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${operadores.map(op => {
+                    const status = this.getStatusMonitor(op.id);
+                    return `
+                    <tr>
+                      <td>${op.nome}</td>
+                      <td>${Number(op.diaria_valor || 0).toFixed(2)}</td>
+                      <td>${op.tipo_contrato ? op.tipo_contrato.toUpperCase() : 'PJ'}</td>
+                      <td>
+                        <div class="d-flex flex-column">
+                          <span class="badge ${status.disponivel ? 'bg-success' : 'bg-danger'}">${status.disponivel ? 'Disponivel' : 'Ocupado agora'}</span>
+                          ${status.motivo ? `<small class="text-muted">${status.motivo}</small>` : ''}
+                        </div>
+                      </td>
+                      <td class="text-end">
+                        <button class="btn btn-outline-primary btn-sm me-2" onclick="app.modules.operadores.showForm(${op.id})">
+                          <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="app.modules.operadores.remover(${op.id})">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  `;}).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+  }
+
+  getOperador(id) {
+    return this.service.listar().find(op => String(op.id) === String(id));
+  }
+
+  getStatusMonitor(operadorId) {
+    const hoje = new Date();
+    hoje.setSeconds(0, 0);
+    const horaAtual = `${String(hoje.getHours()).padStart(2, '0')}:${String(hoje.getMinutes()).padStart(2, '0')}`;
+    const eventosMonitor = (this.eventos || []).filter(ev => {
+      if (!ev.monitorId) return false;
+      if (String(ev.monitorId) !== String(operadorId)) return false;
+      if (ev.status === 'cancelado') return false;
+      const dataEv = this.parseDataLocal(ev.dataInicio);
+      return this.isSameDay(dataEv, hoje);
+    });
+
+    // Ocupado se evento cobre hora atual
+    const emAndamento = eventosMonitor.find(ev => horaAtual >= ev.horaInicio && horaAtual < ev.horaFim && ev.status !== 'finalizado');
+    if (emAndamento) {
+      return { disponivel: false, motivo: `${emAndamento.nome || 'Evento'} (${emAndamento.horaInicio}-${emAndamento.horaFim})` };
+    }
+
+    // Próximo evento do dia
+    const proximo = eventosMonitor
+      .filter(ev => ev.horaInicio > horaAtual)
+      .sort((a, b) => a.horaInicio.localeCompare(b.horaInicio))[0];
+
+    const motivo = proximo ? `Proximo: ${proximo.horaInicio}-${proximo.horaFim}` : '';
+    return { disponivel: true, motivo };
+  }
+
+  parseDataLocal(isoDateStr) {
+    if (!isoDateStr) return new Date();
+    if (isoDateStr instanceof Date) return isoDateStr;
+    const [ano, mes, dia] = isoDateStr.split('-').map(Number);
+    return new Date(ano, mes - 1, dia);
+  }
+
+  isSameDay(date1, date2) {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  }
+
+  showForm(id = null) {
+    const operador = id ? this.getOperador(id) : null;
+    const isEdit = Boolean(operador);
+    const title = isEdit ? 'Editar Monitor' : 'Novo Monitor';
+
+    const formHtml = `
+      <form id="operador-form" class="needs-validation" novalidate>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nome</label>
+            <input type="text" class="form-control" name="nome" required value="${operador ? operador.nome : ''}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Diária (R$)</label>
+            <input type="number" class="form-control" name="diaria_valor" min="0" step="0.01" required value="${operador ? operador.diaria_valor : ''}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Contrato</label>
+            <select class="form-select" name="tipo_contrato">
+              <option value="pj" ${operador?.tipo_contrato === 'pj' ? 'selected' : ''}>PJ</option>
+              <option value="clt" ${operador?.tipo_contrato === 'clt' ? 'selected' : ''}>CLT</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Telefone</label>
+            <input type="text" class="form-control" name="telefone" value="${operador ? operador.telefone || '' : ''}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">E-mail</label>
+            <input type="email" class="form-control" name="email" value="${operador ? operador.email || '' : ''}">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Observações</label>
+            <textarea class="form-control" name="nota_interna" rows="2">${operador ? operador.nota_interna || '' : ''}</textarea>
+          </div>
+        </div>
+        <div class="text-end mt-4">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    `;
+
+    UI.showModal(title, formHtml, true);
+
+    const form = document.getElementById('operador-form');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+      }
+
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        if (isEdit) {
+          await this.service.atualizar(operador.id, {
+            ...data,
+            diaria_valor: parseFloat(data.diaria_valor)
+          });
+          UI.showAlert('Monitor atualizado com sucesso.', 'success');
+        } else {
+          await this.service.criar({
+            ...data,
+            diaria_valor: parseFloat(data.diaria_valor)
+          });
+          UI.showAlert('Monitor criado com sucesso.', 'success');
+        }
+        bootstrap.Modal.getInstance(document.getElementById('dynamicModal')).hide();
+        this.render();
+      } catch (error) {
+        UI.showAlert(error.message || 'Erro ao salvar monitor.', 'danger');
+      }
+    });
+  }
+
+  async remover(id) {
+    const confirmado = confirm('Deseja remover este monitor?');
+    if (!confirmado) return;
+    try {
+      await this.service.deletar(id);
+      UI.showAlert('Monitor removido.', 'success');
+      this.render();
+    } catch (error) {
+      UI.showAlert(error.message || 'Erro ao remover monitor.', 'danger');
+    }
+  }
+}
+
+window.OperadoresModule = OperadoresModule;

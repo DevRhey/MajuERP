@@ -5,6 +5,7 @@ class Dashboard {
     this.clientes = Storage.get("clientes") || [];
     this.itens = Storage.get("itens") || [];
     this.eventos = Storage.get("eventos") || [];
+    this.operadores = Storage.get("operadores") || [];
     this.selectedDate = new Date();
     this.relogioInterval = null;
     this.autoRefreshInterval = null;
@@ -19,7 +20,7 @@ class Dashboard {
   setupStorageListener() {
     window.addEventListener('storageUpdate', (e) => {
       const { key } = e.detail;
-      if (key === 'eventos' || key === 'clientes' || key === 'itens') {
+      if (key === 'eventos' || key === 'clientes' || key === 'itens' || key === 'operadores') {
         this.sync();
         if (app.currentPage === 'dashboard') {
           this.refreshDados();
@@ -32,6 +33,7 @@ class Dashboard {
     this.clientes = Storage.get("clientes") || [];
     this.itens = Storage.get("itens") || [];
     this.eventos = Storage.get("eventos") || [];
+    this.operadores = Storage.get("operadores") || [];
   }
 
   setDisponibilidadeJanela(valor) {
@@ -718,6 +720,34 @@ class Dashboard {
     );
   }
 
+  sanitizePhone(phone) {
+    if (!phone) return '';
+    return phone.replace(/\D/g, '');
+  }
+
+  getWhatsappLink(phone) {
+    const digits = this.sanitizePhone(phone);
+    if (!digits) return null;
+
+    // Se já vem com 55 e 13 dígitos, mantém
+    if (digits.length === 13 && digits.startsWith('55')) {
+      return `https://wa.me/${digits}`;
+    }
+
+    // Se vier com 10 ou 11 dígitos, prefixar 55 (Brasil)
+    if (digits.length === 10 || digits.length === 11) {
+      return `https://wa.me/55${digits}`;
+    }
+
+    // Caso contrário, usar como está
+    return `https://wa.me/${digits}`;
+  }
+
+  getMapsLink(address) {
+    if (!address) return null;
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  }
+
   // Compara se data1 >= data2 (apenas dia, ignorando hora)
   isDateAfterOrEqual(date1, date2) {
     const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
@@ -1052,6 +1082,10 @@ class Dashboard {
       <div class="timeline-events">
         ${eventosDoDia.map((evento, index) => {
           const cliente = this.clientes.find((c) => c.id === evento.clienteId);
+          const monitor = evento.monitorId ? this.operadores.find(op => String(op.id) === String(evento.monitorId)) : null;
+          const eventoNome = evento.nome || 'Evento';
+          const whatsappLink = cliente && cliente.telefone ? this.getWhatsappLink(cliente.telefone) : null;
+          const mapsLink = cliente && cliente.endereco ? this.getMapsLink(cliente.endereco) : null;
           const isAtivo = isHoje && evento.status === 'andamento';
           const isPendente = isHoje && evento.status === 'aguardando' && evento.horaInicio > horaAtual;
           const isFinalizado = evento.status === 'finalizado';
@@ -1130,10 +1164,37 @@ class Dashboard {
                 
                 ${progressoBar}
                 
-                <h6 class="mb-2">
-                  <i class="bi bi-person-circle me-2 text-primary"></i>
-                  ${cliente ? cliente.nome : 'Cliente não encontrado'}
+                <h6 class="mb-1">
+                  <i class="bi bi-calendar-event me-2 text-primary"></i>
+                  ${eventoNome}
                 </h6>
+
+                <div class="mb-2 text-muted">
+                  <i class="bi bi-person-circle me-2"></i>
+                  ${cliente ? cliente.nome : 'Cliente não encontrado'}
+                </div>
+
+                ${cliente?.endereco ? `
+                  <div class="small text-muted mb-2 d-flex align-items-center gap-2">
+                    <span><i class="bi bi-geo-alt me-1"></i>${cliente.endereco}</span>
+                    ${mapsLink ? `<a class="link-primary small" href="${mapsLink}" target="_blank" rel="noopener"><i class="bi bi-map"></i> Navegar no GPS</a>` : ''}
+                  </div>
+                ` : ''}
+
+                ${whatsappLink ? `
+                  <div class="mb-2">
+                    <a class="link-success d-inline-flex align-items-center gap-1" href="${whatsappLink}" target="_blank" rel="noopener">
+                      <i class="bi bi-whatsapp"></i>
+                      <span class="small">${cliente.telefone}</span>
+                    </a>
+                  </div>
+                ` : ''}
+
+                <div class="mb-2 text-muted">
+                  <i class="bi bi-person-badge me-1"></i>
+                  ${monitor ? monitor.nome : 'Sem monitor atribuido'}
+                  ${evento.monitorPagamento ? `<span class="badge bg-light text-dark ms-2">R$ ${Number(evento.monitorPagamento).toFixed(2)}</span>` : ''}
+                </div>
                 
                 <div class="d-flex flex-wrap gap-2 mb-2">
                   ${evento.itens.map(itemEvento => {

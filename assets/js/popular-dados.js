@@ -13,6 +13,14 @@ async function popularSistema() {
   // Limpar dados existentes
   Storage.resetAll();
 
+  // Garantir formas de pagamento padrão
+  Storage.save("formasPagamento", [
+    { id: "pix", nome: "PIX" },
+    { id: "debito", nome: "Debito" },
+    { id: "credito", nome: "Credito" },
+    { id: "dinheiro", nome: "Dinheiro" }
+  ]);
+
   // 1. POPULAR CLIENTES
   const clientes = [
     {
@@ -199,6 +207,16 @@ async function popularSistema() {
   Storage.save("itens", itens);
   console.log("✅ Itens populados:", itens.length);
 
+  // 2.1 POPULAR OPERADORES / MONITORES
+  const operadores = [
+    { id: 501, nome: "Bruna Almeida", telefone: "(11) 98989-1111", email: "bruna@monitores.com", diaria_valor: 180, tipo_contrato: "pj", disponivel: true, especialidades: ["pula-pula", "recreacao"], total_diarias_trabalhadas: 0, total_ganho: 0, total_pago: 0, total_pendente: 0 },
+    { id: 502, nome: "Diego Martins", telefone: "(11) 97777-2222", email: "diego@monitores.com", diaria_valor: 220, tipo_contrato: "pj", disponivel: true, especialidades: ["toboga", "pintura"], total_diarias_trabalhadas: 0, total_ganho: 0, total_pago: 0, total_pendente: 0 },
+    { id: 503, nome: "Fernanda Lopes", telefone: "(11) 96666-3333", email: "fernanda@monitores.com", diaria_valor: 200, tipo_contrato: "clt", disponivel: true, especialidades: ["decoracao", "pula-pula"], total_diarias_trabalhadas: 0, total_ganho: 0, total_pago: 0, total_pendente: 0 },
+    { id: 504, nome: "Gustavo Silva", telefone: "(11) 95555-4444", email: "gustavo@monitores.com", diaria_valor: 150, tipo_contrato: "pj", disponivel: true, especialidades: ["algodao", "pipoca"], total_diarias_trabalhadas: 0, total_ganho: 0, total_pago: 0, total_pendente: 0 }
+  ];
+  Storage.save("operadores", operadores);
+  console.log("✅ Operadores populados:", operadores.length);
+
   // 3. POPULAR EVENTOS (dinâmicos em torno da data atual)
   const base = new Date();
   base.setHours(0, 0, 0, 0);
@@ -229,7 +247,9 @@ async function popularSistema() {
     ],
     observacoes: "Festa escolar encerrada ontem",
     status: "finalizado",
-    valorTotal: 520.00
+    valorTotal: 520.00,
+    monitorId: operadores[0].id,
+    monitorPagamento: 180
   });
 
   // Em andamento agora (largura longa para testar buffers)
@@ -245,9 +265,11 @@ async function popularSistema() {
       { id: itens[6].id, quantidade: 2 },
       { id: itens[9].id, quantidade: 1 }
     ],
-    observacoes: "Evento de dia inteiro - teste de ocupação",
+    observacoes: "Evento de dia inteiro - teste de ocupacao",
     status: "andamento",
-    valorTotal: 1450.00
+    valorTotal: 1450.00,
+    monitorId: operadores[1].id,
+    monitorPagamento: 220
   });
 
   // Sobreposição no dia (para conflito/ocupação)
@@ -262,9 +284,11 @@ async function popularSistema() {
       { id: itens[2].id, quantidade: 2 },
       { id: itens[7].id, quantidade: 1 }
     ],
-    observacoes: "Aniversário com possível conflito de itens",
+    observacoes: "Aniversario com possivel conflito de itens",
     status: "aguardando",
-    valorTotal: 980.00
+    valorTotal: 980.00,
+    monitorId: operadores[2].id,
+    monitorPagamento: 200
   });
 
   // Aguardando hoje à noite
@@ -279,9 +303,11 @@ async function popularSistema() {
       { id: itens[5].id, quantidade: 2 },
       { id: itens[11].id, quantidade: 1 }
     ],
-    observacoes: "Evento noturno aguardando confirmação",
+    observacoes: "Evento noturno aguardando confirmacao",
     status: "aguardando",
-    valorTotal: 1240.00
+    valorTotal: 1240.00,
+    monitorId: operadores[2].id,
+    monitorPagamento: 200
   });
 
   // Amanhã cedo (aguardando)
@@ -296,9 +322,11 @@ async function popularSistema() {
       { id: itens[4].id, quantidade: 1 },
       { id: itens[10].id, quantidade: 1 }
     ],
-    observacoes: "Manhã seguinte - teste de agenda",
+    observacoes: "Manha seguinte - teste de agenda",
     status: "aguardando",
-    valorTotal: 690.00
+    valorTotal: 690.00,
+    monitorId: operadores[0].id,
+    monitorPagamento: 180
   });
 
   // Depois de amanhã (aguardando) com muitos itens para stress de estoque
@@ -317,7 +345,9 @@ async function popularSistema() {
     ],
     observacoes: "Grande evento escolar - carga alta",
     status: "aguardando",
-    valorTotal: 1980.00
+    valorTotal: 1980.00,
+    monitorId: operadores[3].id,
+    monitorPagamento: 150
   });
 
   // Cancelado para testar exclusões
@@ -331,9 +361,11 @@ async function popularSistema() {
       { id: itens[8].id, quantidade: 1 },
       { id: itens[9].id, quantidade: 1 }
     ],
-    observacoes: "Evento cancelado - manter para histórico",
+    observacoes: "Evento cancelado - manter para historico",
     status: "cancelado",
-    valorTotal: 310.00
+    valorTotal: 310.00,
+    monitorId: operadores[2].id,
+    monitorPagamento: 200
   });
 
   // Finalizado há 3 dias para relatório
@@ -350,41 +382,28 @@ async function popularSistema() {
     ],
     observacoes: "Passado recente para dashboards",
     status: "finalizado",
-    valorTotal: 840.00
+    valorTotal: 840.00,
+    monitorId: operadores[0].id,
+    monitorPagamento: 180
   });
 
   Storage.save("eventos", eventos);
   console.log("✅ Eventos populados:", eventos.length);
 
   // Exibir resumo
-  const resumo = `
-╔════════════════════════════════════════════════════╗
-║     SISTEMA POPULADO COM SUCESSO! 🎉              ║
-╠════════════════════════════════════════════════════╣
-║  👥 Clientes cadastrados: ${clientes.length.toString().padStart(2, ' ')}                      ║
-║  🎪 Itens cadastrados: ${itens.length.toString().padStart(2, ' ')}                         ║
-║  📅 Eventos cadastrados: ${eventos.length.toString().padStart(2, ' ')}                      ║
-╠════════════════════════════════════════════════════╣
-║  📊 STATUS DOS EVENTOS:                            ║
-║     • Finalizados: ${eventos.filter(e => e.status === 'finalizado').length}                              ║
-║     • Em Andamento: ${eventos.filter(e => e.status === 'andamento').length}                            ║
-║     • Aguardando: ${eventos.filter(e => e.status === 'aguardando').length}                             ║
-╠════════════════════════════════════════════════════╣
-║  💰 FATURAMENTO TOTAL: R$ ${eventos.reduce((sum, e) => sum + e.valorTotal, 0).toFixed(2).padStart(8, ' ')}       ║
-╚════════════════════════════════════════════════════╝
-
-✅ Dados de teste carregados com sucesso!
-🔍 Navegue pelas páginas para testar todas as funcionalidades:
-   - Dashboard: Veja estatísticas e gráficos
-   - Clientes: Gerencie os clientes cadastrados
-   - Itens: Visualize o estoque disponível
-   - Eventos: Acompanhe todos os eventos
-   - Calendário: Veja os eventos no calendário
-  `;
+  const resumo = [
+    "SISTEMA POPULADO COM SUCESSO",
+    `Clientes cadastrados: ${clientes.length}`,
+    `Itens cadastrados: ${itens.length}`,
+    `Operadores cadastrados: ${operadores.length}`,
+    `Eventos cadastrados: ${eventos.length}`,
+    `Status - Finalizados: ${eventos.filter(e => e.status === 'finalizado').length}, Em Andamento: ${eventos.filter(e => e.status === 'andamento').length}, Aguardando: ${eventos.filter(e => e.status === 'aguardando').length}`,
+    `Faturamento total: R$ ${eventos.reduce((sum, e) => sum + e.valorTotal, 0).toFixed(2)}`
+  ].join('\n');
 
   console.log(resumo);
   
-  UI.showAlert("Sistema populado com sucesso! Recarregando página...", "success");
+  UI.showAlert("Sistema populado com sucesso! Recarregando pagina...", "success");
   
   setTimeout(() => {
     location.reload();

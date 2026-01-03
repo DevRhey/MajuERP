@@ -12,6 +12,33 @@ class Eventos {
     this.setupStorageListener();
   }
   
+  cadastrarMonitorRapido() {
+    const nome = (document.querySelector('#monitorNomeNovo')?.value || '').trim();
+    const diaria = document.querySelector('#monitorValorNovo')?.value || '';
+
+    if (!nome) {
+      alert('Informe o nome do monitor.');
+      return;
+    }
+
+    const novoMonitor = {
+      id: crypto.randomUUID(),
+      nome,
+      diaria_valor: diaria || null,
+      telefone: '',
+      email: ''
+    };
+
+    this.operadores.push(novoMonitor);
+    this.salvarOperadoresLocal();
+    this.atualizarSelectMonitores(novoMonitor.id);
+
+    const nomeInput = document.querySelector('#monitorNomeNovo');
+    const valorInput = document.querySelector('#monitorValorNovo');
+    if (nomeInput) nomeInput.value = '';
+    if (valorInput) valorInput.value = '';
+  }
+  
   destroy() {
     // Limpar background sync listener
     if (this.unsubscribeBgSync) {
@@ -39,7 +66,7 @@ class Eventos {
   setupStorageListener() {
     window.addEventListener("storageUpdate", (e) => {
       const { key } = e.detail;
-      if (key === "eventos" || key === "clientes" || key === "itens" || key === "financeiroTransacoes") {
+      if (key === "eventos" || key === "clientes" || key === "itens" || key === "financeiroTransacoes" || key === "operadores") {
         this.sync();
         if (window.app && app.currentPage === "eventos") {
           this.render();
@@ -52,6 +79,41 @@ class Eventos {
     this.eventos = Storage.get("eventos") || [];
     this.clientes = Storage.get("clientes") || [];
     this.itens = Storage.get("itens") || [];
+    this.operadores = Storage.get("operadores") || [];
+  }
+
+  salvarOperadoresLocal() {
+    Storage.save("operadores", this.operadores || []);
+  }
+
+  atualizarSelectMonitores(selectedId = null, dataInicio = null, horaInicio = null, horaFim = null, eventoIdExcluir = null) {
+    const select = document.querySelector('#monitorId');
+    if (!select) return;
+
+    const currentValue = select.value;
+    const targetValue = selectedId !== null ? selectedId : currentValue;
+
+    const hasHorario = !!(dataInicio && horaInicio && horaFim);
+
+    select.innerHTML = `
+      <option value="">Sem monitor</option>
+      ${this.operadores.map(op => {
+        const isSelected = targetValue && String(targetValue) === String(op.id);
+        const disponivel = hasHorario
+          ? this.isMonitorDisponivel(op.id, dataInicio, horaInicio, horaFim, eventoIdExcluir)
+          : true;
+        const disabledAttr = !disponivel && !isSelected ? 'disabled' : '';
+        const statusLabel = !disponivel && !isSelected ? ' (ocupado no horário)' : '';
+        const valor = op.diaria_valor ? ` - R$ ${Number(op.diaria_valor).toFixed(2)}` : '';
+        return `
+          <option value="${op.id}" ${disabledAttr}>${op.nome}${valor}${statusLabel}</option>
+        `;
+      }).join('')}
+    `;
+
+    if (targetValue) {
+      select.value = targetValue;
+    }
   }
 
   // ------- Renderização -------
@@ -162,6 +224,7 @@ class Eventos {
       const statusText = this.getStatusText(evento.status);
       const pagamentoInfo = this.getPagamentoInfo(evento);
       const dataEvento = this.parseDataLocal(evento.dataInicio);
+          const monitor = evento.monitorId ? (this.operadores.find(o => String(o.id) === String(evento.monitorId)) || null) : null;
 
       return `
         <div class="col-md-6 col-lg-4 mb-4">
@@ -217,6 +280,13 @@ class Eventos {
                     <strong class="fs-6 ${pagamentoInfo.restante > 0 ? 'text-warning' : 'text-success'}">
                       R$ ${pagamentoInfo.totalPago.toFixed(2)}
                     </strong>
+                  </div>
+                  <div class="mt-2">
+                    <small class="text-muted">
+                      <i class="bi bi-person-badge me-1"></i>
+                      Monitor: ${monitor ? monitor.nome : 'Não definido'}
+                      ${evento.monitorPagamento ? ` • Pagamento: R$ ${Number(evento.monitorPagamento).toFixed(2)}` : ''}
+                    </small>
                   </div>
                 </div>
                 ${pagamentoInfo.restante > 0 ? `
@@ -416,6 +486,49 @@ class Eventos {
           </button>
         </div>
 
+        <div class="card bg-light mb-3">
+          <div class="card-header"><strong>Monitor / Operador</strong></div>
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label for="monitorId" class="form-label">Selecione o Monitor/Operador</label>
+                <select class="form-select" id="monitorId" name="monitorId">
+                  <option value="">Sem monitor</option>
+                   ${this.operadores.map(op => `
+                     <option value="${op.id}" ${isEdit && String(evento.monitorId) === String(op.id) ? 'selected' : ''}>${op.nome}${op.diaria_valor ? ` - R$ ${Number(op.diaria_valor).toFixed(2)}` : ''}</option>
+                   `).join('')}
+                </select>
+                <small class="text-muted">Cadastre abaixo caso ainda não exista.</small>
+              </div>
+              <div class="col-md-4">
+                <label for="monitorPagamento" class="form-label">Pagamento ao Monitor (R$)</label>
+                <input type="number" class="form-control" id="monitorPagamento" name="monitorPagamento" min="0" step="0.01"
+                       value="${isEdit && evento.monitorPagamento ? evento.monitorPagamento : ''}" placeholder="Ex.: 150,00">
+                <small class="text-muted">Informe a diária/valor acordado</small>
+              </div>
+            </div>
+
+            <div class="border-top pt-3 mt-3">
+              <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                  <label for="monitorNomeNovo" class="form-label">Cadastrar Monitor Rápido</label>
+                  <input type="text" class="form-control" id="monitorNomeNovo" name="monitorNomeNovo" placeholder="Nome do monitor">
+                </div>
+                <div class="col-md-3">
+                  <label for="monitorValorNovo" class="form-label">Diária (R$)</label>
+                  <input type="number" class="form-control" id="monitorValorNovo" name="monitorValorNovo" min="0" step="0.01" placeholder="150,00">
+                </div>
+                <div class="col-md-3">
+                  <button type="button" class="btn btn-outline-success w-100" onclick="app.modules.eventos.cadastrarMonitorRapido()">
+                    <i class="bi bi-person-plus"></i> Cadastrar
+                  </button>
+                </div>
+              </div>
+              <small class="text-muted d-block mt-1">Preencha e clique em cadastrar para adicionar e selecionar automaticamente.</small>
+            </div>
+          </div>
+        </div>
+
         <div class="mb-3">
           <label for="observacoes" class="form-label">Observações</label>
           <textarea class="form-control" id="observacoes" name="observacoes" rows="3">${isEdit ? evento.observacoes || "" : ""}</textarea>
@@ -474,6 +587,25 @@ class Eventos {
       form.dataset.eventoId = evento.id;
     }
 
+    const avaliarDisponibilidade = () => {
+      const dataVal = document.querySelector('#dataInicio')?.value;
+      const hIni = document.querySelector('#horaInicio')?.value;
+      const hFim = document.querySelector('#horaFim')?.value;
+      const selVal = document.querySelector('#monitorId')?.value || null;
+      this.atualizarSelectMonitores(selVal, dataVal, hIni, hFim, isEdit ? evento.id : null);
+    };
+
+    // Avaliar disponibilidade inicial (com valores do form)
+    avaliarDisponibilidade();
+
+    // Atualizar disponibilidade ao alterar data/horários
+    ['dataInicio', 'horaInicio', 'horaFim'].forEach(id => {
+      const el = document.querySelector(`#${id}`);
+      if (el) {
+        el.addEventListener('change', avaliarDisponibilidade);
+      }
+    });
+
     let isSubmitting = false;
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -488,6 +620,8 @@ class Eventos {
         const taxaDeslocamento = parseFloat(formData.get("taxaDeslocamento")) || 0;
         const valorTotal = valorItens + taxaDeslocamento;
         const valorEntrada = parseFloat(formData.get("valorEntrada")) || 0;
+        const monitorId = formData.get("monitorId") || null;
+        const monitorPagamento = parseFloat(formData.get("monitorPagamento")) || 0;
 
         const eventoData = {
           id: isEdit ? evento.id : Date.now(),
@@ -504,6 +638,8 @@ class Eventos {
           valorEntrada,
           formaPagamentoId: formData.get("formaPagamentoId") || null,
           pagamentos: isEdit ? evento.pagamentos || [] : [],
+          monitorId,
+          monitorPagamento,
         };
 
         // ===== INTEGRAÇÃO IA: Detector de Conflitos =====
@@ -683,6 +819,7 @@ class Eventos {
     const horaFim = form.querySelector("#horaFim").value;
     const itens = this.getItensFromForm();
     const eventoIdExcluir = form.dataset.eventoId ? parseInt(form.dataset.eventoId) : null;
+    const monitorId = form.querySelector("#monitorId")?.value || null;
 
     if (horaInicio >= horaFim) {
       toast.error("O horário de início deve ser anterior ao término");
@@ -704,6 +841,10 @@ class Eventos {
     }
 
     if (!this.verificarDisponibilidadeItens(dataInicio, horaInicio, horaFim, itens, eventoIdExcluir)) {
+      return false;
+    }
+
+    if (monitorId && !this.verificarDisponibilidadeMonitor(dataInicio, horaInicio, horaFim, monitorId, eventoIdExcluir)) {
       return false;
     }
 
@@ -789,6 +930,45 @@ class Eventos {
     }
 
     return true;
+  }
+
+  verificarDisponibilidadeMonitor(dataInicio, horaInicio, horaFim, monitorId, eventoIdExcluir = null) {
+    const dataEvento = this.parseDataLocal(dataInicio);
+    const eventosMonitor = this.eventos.filter((ev) => {
+      if (!ev.monitorId) return false;
+      if (eventoIdExcluir && ev.id === eventoIdExcluir) return false;
+      if (String(ev.monitorId) !== String(monitorId)) return false;
+      const dataEv = this.parseDataLocal(ev.dataInicio);
+      if (!this.isSameDay(dataEvento, dataEv)) return false;
+      if (ev.status === 'cancelado') return false;
+      return true;
+    });
+
+    const conflito = eventosMonitor.find((ev) => {
+      return horaInicio < ev.horaFim && horaFim > ev.horaInicio;
+    });
+
+    if (conflito) {
+      const monitor = this.operadores.find(op => String(op.id) === String(monitorId));
+      const nomeMonitor = monitor ? monitor.nome : 'Monitor';
+      toast.error(`${nomeMonitor} já está alocado no evento "${conflito.nome}" (${conflito.horaInicio} - ${conflito.horaFim}).`);
+      return false;
+    }
+
+    return true;
+  }
+
+  isMonitorDisponivel(monitorId, dataInicio, horaInicio, horaFim, eventoIdExcluir = null) {
+    const dataEvento = this.parseDataLocal(dataInicio);
+    return !this.eventos.some(ev => {
+      if (!ev.monitorId) return false;
+      if (String(ev.monitorId) !== String(monitorId)) return false;
+      if (eventoIdExcluir && ev.id === eventoIdExcluir) return false;
+      if (ev.status === 'cancelado') return false;
+      const dataEv = this.parseDataLocal(ev.dataInicio);
+      if (!this.isSameDay(dataEvento, dataEv)) return false;
+      return horaInicio < ev.horaFim && horaFim > ev.horaInicio;
+    });
   }
 
   // ------- CRUD -------
